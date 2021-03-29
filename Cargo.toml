@@ -1,9 +1,9 @@
 [package]
 name = "vcf2rdf"
-version = "0.1.0"
+version = "1.0.0-alpha.1"
 authors = ["Daisuke Satoh <daisuke.satoh@lifematics.co.jp>"]
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "Convert Variant Call Format (VCF) to Resource Description Framework (RDF) Format."
+license = "Apache-2.0"
 
 [dependencies]
