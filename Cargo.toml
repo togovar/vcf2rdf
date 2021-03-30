@@ -7,3 +7,6 @@ description = "Convert Variant Call Format (VCF) to Resource Description Framewo
 license = "Apache-2.0"
 
 [dependencies]
+anyhow = "1.0"
+structopt = "0.3"
+strum = { version = "0.20", features = ["derive"] }
