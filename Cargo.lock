@@ -546,6 +546,7 @@ name = "vcf2rdf"
 version = "1.0.0-alpha.1"
 dependencies = [
  "anyhow",
+ "libc",
  "rust-htslib",
  "structopt",
  "strum",
