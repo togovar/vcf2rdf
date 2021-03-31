@@ -14,7 +14,7 @@ pub enum OutputFormat {
 
 #[derive(StructOpt, Debug)]
 #[structopt(about = crate_description!())]
-pub struct Options {
+pub struct CLI {
     /// Verbose mode{n}
     /// -v   -> report statistics messages{n}
     /// -vv  -> report warning messages{n}
@@ -33,4 +33,21 @@ pub struct Options {
     /// File to process
     #[structopt(name = "FILE", parse(from_os_str))]
     input: PathBuf,
+}
+
+#[derive(StructOpt, Debug)]
+#[structopt(name = "vcf_stat", about = "Obtain VCF statistics")]
+pub struct VCFStat {
+    #[structopt(subcommand)]
+    pub cmd: Command,
+}
+
+#[derive(StructOpt, Debug)]
+pub enum Command {
+    /// Count records
+    Count {
+        /// File to process
+        #[structopt(name = "FILE", parse(from_os_str))]
+        input: PathBuf,
+    },
 }

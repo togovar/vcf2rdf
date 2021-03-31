@@ -1,10 +1,10 @@
 use anyhow::Result;
 use structopt::StructOpt;
 
-use vcf2rdf::cli::Options;
+use vcf2rdf::cli::CLI;
 
 fn main() -> Result<()> {
-    Options::from_args();
+    CLI::from_args();
 
     Ok(())
 }
