@@ -8,5 +8,7 @@ license = "Apache-2.0"
 
 [dependencies]
 anyhow = "1.0"
+rust-htslib = { version = "0.36", default-features = false }
 structopt = "0.3"
 strum = { version = "0.20", features = ["derive"] }
+thiserror = "1.0"
