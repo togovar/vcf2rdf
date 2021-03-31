@@ -1,3 +1,4 @@
+//! Module for command line interface
 use std::path::PathBuf;
 
 use structopt::clap::crate_description;
