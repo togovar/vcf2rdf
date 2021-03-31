@@ -24,7 +24,9 @@ impl Drop for Reader {
 /// Returns the hts format information
 ///
 /// Definition of `htsFormat` and its constants are:
-/// ```rust
+/// ```no_run
+/// #[repr(C)]
+/// #[derive(Debug, Copy, Clone)]
 /// pub struct htsFormat {
 ///     pub category: htsFormatCategory,
 ///     pub format: htsExactFormat,
@@ -32,6 +34,13 @@ impl Drop for Reader {
 ///     pub compression: htsCompression,
 ///     pub compression_level: ::std::os::raw::c_short,
 ///     pub specific: *mut ::std::os::raw::c_void,
+/// }
+///
+/// #[repr(C)]
+/// #[derive(Debug, Copy, Clone)]
+/// pub struct htsFormat__bindgen_ty_1 {
+///     pub major: ::std::os::raw::c_short,
+///     pub minor: ::std::os::raw::c_short,
 /// }
 ///
 /// pub const htsFormatCategory_unknown_category: htsFormatCategory = 0;
