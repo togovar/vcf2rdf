@@ -1,4 +1,6 @@
 //! Module for working with VCF
+pub mod compress;
+
 use std::ffi::{CString, OsString};
 use std::path::{Path, PathBuf};
 
