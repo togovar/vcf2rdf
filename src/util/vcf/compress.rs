@@ -5,10 +5,11 @@ use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 
 use anyhow::anyhow;
-use anyhow::Result;
 use bgzip::BGZFWriter;
 use flate2;
 use rust_htslib::htslib;
+
+use crate::errors::Result;
 
 /// Compress input file to bgzip
 ///
@@ -20,7 +21,7 @@ use rust_htslib::htslib;
 ///
 /// # Example
 /// ```no_run
-/// use vcf2rdf::vcf::compress;
+/// use vcf2rdf::util::vcf::compress;
 /// compress::from_path("path/to/your.vcf", None, true);
 /// // => to be stored at path/to/your.vcf.gz
 /// ```
@@ -47,7 +48,7 @@ pub fn from_path<P: AsRef<Path>>(input: P, level: Option<u32>, tabix: bool) -> R
 /// Example:
 /// ```no_run
 /// use std::io::{self, Read, BufReader};
-/// use vcf2rdf::vcf::compress;
+/// use vcf2rdf::util::vcf::compress;
 /// let mut reader = BufReader::new(io::stdin());
 /// compress::from_reader(&mut reader, "path/to/your.vcf.gz", None, true);
 /// // => to be stored at path/to/your.vcf.gz
@@ -71,7 +72,7 @@ pub fn from_reader<R: BufRead, P: AsRef<Path>>(
     writer.close()?;
 
     if tabix {
-        crate::vcf::compress::tabix(&output)?;
+        crate::util::vcf::compress::tabix(&output)?;
     }
 
     Ok(())
@@ -97,7 +98,7 @@ pub fn from_reader<R: BufRead, P: AsRef<Path>>(
 ///
 /// Example:
 /// ```no_run
-/// use vcf2rdf::vcf::compress;
+/// use vcf2rdf::util::vcf::compress;
 /// compress::tabix("path/to/your.vcf.gz");
 /// // => to be stored at path/to/your.vcf.gz.tbi
 /// ```

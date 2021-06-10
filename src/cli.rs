@@ -5,34 +5,38 @@ use structopt::clap::crate_description;
 use structopt::StructOpt;
 use strum::{EnumString, EnumVariantNames, VariantNames};
 
+pub mod configuration;
+
 #[derive(EnumString, EnumVariantNames, Debug)]
-#[strum(serialize_all = "kebab_case")]
-pub enum OutputFormat {
-    NTriples,
-    Turtle,
+#[strum(serialize_all = "lowercase")]
+pub enum SubjectID {
+    ID,
+    Location,
 }
 
 #[derive(StructOpt, Debug)]
 #[structopt(about = crate_description!())]
 pub struct CLI {
-    /// Verbose mode{n}
-    /// -v   -> report statistics messages{n}
-    /// -vv  -> report warning messages{n}
-    /// -vvv -> report debug messages
-    #[structopt(short, long, parse(from_occurrences))]
-    verbose: u8,
+    /// Assembly. (e.g. GRCh37, GRCh38)
+    #[structopt(short, long)]
+    pub assembly: String, // TODO: Support user's definition
 
-    /// Log device [default: STDERR]
-    #[structopt(long, parse(from_os_str))]
-    log_dev: Option<PathBuf>,
+    /// Path to configuration yaml.
+    #[structopt(short, long, parse(from_os_str))]
+    pub config: Option<PathBuf>,
 
-    /// Output format
-    #[structopt(short, long, possible_values = OutputFormat::VARIANTS, case_insensitive = true, default_value = "n-triples")]
-    format: OutputFormat,
+    /// Process only one record and exit.
+    #[structopt(long)]
+    pub rehearsal: bool,
 
-    /// File to process
-    #[structopt(name = "FILE", parse(from_os_str))]
-    input: PathBuf,
+    /// Strategy to generate subject ID (use blank node if not specified).
+    /// If use `id`, ensure that all values at ID column are present and unique.
+    #[structopt(short, long, possible_values = SubjectID::VARIANTS)]
+    pub subject_id: Option<SubjectID>,
+
+    /// Path to file to process.
+    #[structopt(parse(from_os_str))]
+    pub input: PathBuf,
 }
 
 #[derive(StructOpt, Debug)]
@@ -44,9 +48,9 @@ pub struct VCFStat {
 
 #[derive(StructOpt, Debug)]
 pub enum Command {
-    /// Count records
+    /// Count records.
     Count {
-        /// File to process
+        /// File to process.
         #[structopt(name = "FILE", parse(from_os_str))]
         input: PathBuf,
     },
