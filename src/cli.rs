@@ -25,6 +25,10 @@ pub struct CLI {
     #[structopt(short, long, parse(from_os_str))]
     pub config: Option<PathBuf>,
 
+    /// Generate config template and exit.
+    #[structopt(short, long)]
+    pub generate_config: bool,
+
     /// Process only one record and exit.
     #[structopt(long)]
     pub rehearsal: bool,
@@ -43,14 +47,31 @@ pub struct CLI {
 #[structopt(name = "vcf_stat", about = "Obtain VCF statistics")]
 pub struct VCFStat {
     #[structopt(subcommand)]
-    pub cmd: Command,
+    pub cmd: VCFStatCommand,
 }
 
 #[derive(StructOpt, Debug)]
-pub enum Command {
+pub enum VCFStatCommand {
     /// Count records.
     Count {
-        /// File to process.
+        /// Path to file to process.
+        #[structopt(name = "FILE", parse(from_os_str))]
+        input: PathBuf,
+    },
+}
+
+#[derive(StructOpt, Debug)]
+#[structopt(name = "vcf_stat", about = "Obtain VCF statistics")]
+pub struct VCF2RDFConfig {
+    #[structopt(subcommand)]
+    pub cmd: VCF2RDFConfigCommand,
+}
+
+#[derive(StructOpt, Debug)]
+pub enum VCF2RDFConfigCommand {
+    /// Generate config template.
+    Generate {
+        /// Path to file to process.
         #[structopt(name = "FILE", parse(from_os_str))]
         input: PathBuf,
     },
