@@ -25,7 +25,7 @@ jobs:
         id: tag
         with:
           text: ${{ github.ref }}
-          regex: '^v(.+)$'
+          regex: 'v(.+)'
 
       - name: Build and push
         id: docker_build
