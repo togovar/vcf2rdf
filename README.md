@@ -11,7 +11,9 @@ Since vcf2rdf aims to convert large VCF fast, the generated RDF model is very si
 
 ### Use docker
 
-Preparing...
+```shell
+$ docker pull togoavr/vcf2rdf
+```
 
 ### Use pre-built binary
 
@@ -100,3 +102,9 @@ info:
 All keys listed in VCF meta-information lines (##INFO=<...>) are filled in info.
 Remove key names that you do not need in converted RDF.
 Without a configuration file, all values in the INFO field will be used.
+
+#### with docker
+
+```shell
+$ docker run --rm -v $(pwd):/work togovar/vcf2rdf vcf2rdf convert -a GRCh37 /work/input.vcf.gz
+```
