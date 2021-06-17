@@ -6,6 +6,22 @@ use structopt::StructOpt;
 use strum::{EnumString, EnumVariantNames, VariantNames};
 
 pub mod configuration;
+pub mod converter;
+pub mod generator;
+pub mod statistics;
+
+#[derive(StructOpt, Debug)]
+#[structopt(about = crate_description!())]
+pub enum Command {
+    /// Converts VCF to RDF.
+    Convert(Convert),
+
+    /// Prints statistics.
+    Stat(Statistics),
+
+    /// Generates template.
+    Generate(Generate),
+}
 
 #[derive(EnumString, EnumVariantNames, Debug)]
 #[strum(serialize_all = "lowercase")]
@@ -15,8 +31,7 @@ pub enum SubjectID {
 }
 
 #[derive(StructOpt, Debug)]
-#[structopt(about = crate_description!())]
-pub struct CLI {
+pub struct Convert {
     /// Assembly. (e.g. GRCh37, GRCh38)
     #[structopt(short, long)]
     pub assembly: String, // TODO: Support user's definition
@@ -25,11 +40,7 @@ pub struct CLI {
     #[structopt(short, long, parse(from_os_str))]
     pub config: Option<PathBuf>,
 
-    /// Generate config template and exit.
-    #[structopt(short, long)]
-    pub generate_config: bool,
-
-    /// Process only one record and exit.
+    /// Processes only one record and exit.
     #[structopt(long)]
     pub rehearsal: bool,
 
@@ -44,15 +55,8 @@ pub struct CLI {
 }
 
 #[derive(StructOpt, Debug)]
-#[structopt(name = "vcf_stat", about = "Obtain VCF statistics")]
-pub struct VCFStat {
-    #[structopt(subcommand)]
-    pub cmd: VCFStatCommand,
-}
-
-#[derive(StructOpt, Debug)]
-pub enum VCFStatCommand {
-    /// Count records.
+pub enum Statistics {
+    /// Counts records.
     Count {
         /// Path to file to process.
         #[structopt(name = "FILE", parse(from_os_str))]
@@ -61,16 +65,9 @@ pub enum VCFStatCommand {
 }
 
 #[derive(StructOpt, Debug)]
-#[structopt(name = "vcf_stat", about = "Obtain VCF statistics")]
-pub struct VCF2RDFConfig {
-    #[structopt(subcommand)]
-    pub cmd: VCF2RDFConfigCommand,
-}
-
-#[derive(StructOpt, Debug)]
-pub enum VCF2RDFConfigCommand {
-    /// Generate config template.
-    Generate {
+pub enum Generate {
+    /// Generates config template.
+    Config {
         /// Path to file to process.
         #[structopt(name = "FILE", parse(from_os_str))]
         input: PathBuf,

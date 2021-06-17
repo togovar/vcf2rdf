@@ -1,16 +1,11 @@
-//! Executable for working with VCF2RDF configuration.
-use structopt::StructOpt;
+use crate::cli::configuration::Configuration;
+use crate::cli::Generate;
+use crate::errors::Result;
+use crate::vcf::reader::Reader;
 
-use vcf2rdf::cli::configuration::Configuration;
-use vcf2rdf::cli::{VCF2RDFConfig, VCF2RDFConfigCommand};
-use vcf2rdf::errors::Result;
-use vcf2rdf::vcf::reader::Reader;
-
-fn main() -> Result<()> {
-    let options: VCF2RDFConfig = VCF2RDFConfig::from_args();
-
-    match options.cmd {
-        VCF2RDFConfigCommand::Generate { input } => {
+pub fn run(command: Generate) -> Result<()> {
+    match command {
+        Generate::Config { input } => {
             let vcf = Reader::from_path(input)?;
 
             let config = Configuration {
