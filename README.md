@@ -1,8 +1,8 @@
 # vcf2rdf
 
-![GitHub](https://img.shields.io/github/license/togovar/vcf2rdf)
-![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/togovar/vcf2rdf?logo=github)
-![Docker Image Version (latest semver)](https://img.shields.io/docker/v/togovar/vcf2rdf?logo=docker)
+[![GitHub](https://img.shields.io/github/license/togovar/vcf2rdf)](https://github.com/togovar/vcf2rdf/blob/main/LICENSE)
+[![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/togovar/vcf2rdf?logo=github)](https://github.com/togovar/vcf2rdf/releases)
+[![Docker Image Version (latest semver)](https://img.shields.io/docker/v/togovar/vcf2rdf?logo=docker)](https://hub.docker.com/r/togovar/vcf2rdf)
 
 vcf2rdf is a command-line tool for converting from [Variant Call Format (VCF)](https://en.wikipedia.org/wiki/Variant_Call_Format) to [Resource Description Format (RDF)](https://en.wikipedia.org/wiki/Resource_Description_Framework).
 Since vcf2rdf aims to convert large VCF fast, the generated RDF model is very simple.
