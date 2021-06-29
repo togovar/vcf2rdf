@@ -54,30 +54,19 @@ SUBCOMMANDS:
 
 ### Convert VCF to RDF
 
-```
-USAGE:
-    vcf2rdf convert [FLAGS] [OPTIONS] <input> --assembly <assembly>
+Currently, `vcf2rdf` can only handle gzipped and tabix-indexed vcf.
+Compressing and indexing the VCF with `bgzip` and `tabix` is required.
+For more details, visit [Samtools](https://www.htslib.org).
 
-FLAGS:
-    -h, --help         Prints help information
-        --rehearsal    Processes only one record and exit
-    -V, --version      Prints version information
-
-OPTIONS:
-    -a, --assembly <assembly>        Assembly. (e.g. GRCh37, GRCh38)
-    -c, --config <config>            Path to configuration yaml
-    -s, --subject-id <subject-id>    Strategy to generate subject ID (use blank node if not specified). If use `id`,
-                                     ensure that all values at ID column are present and unique [possible values: id,
-                                     location]
-
-ARGS:
-    <input>    Path to file to process
+```shell
+$ bgzip -c input.vcf > input.vcf.gz
+$ tabix input.vcf.gz
 ```
 
-To generate config template:
+To generate configuration template:
 
-```
-$ vcf2rdf generate config <input.vcf>
+```shell
+$ vcf2rdf generate config -a GRCh38 input.vcf.gz > config.yaml
 ```
 
 then output:
@@ -97,14 +86,66 @@ info:
   - key2
   - key3
   - ...
+
+# Sequence reference mapping.
+reference:
+  "1":           # Value of CHROM column
+    name: ~      # Value used to location-based subject
+    reference: ~ # URI for faldo:reference
+  ...
 ```
 
 All keys listed in VCF meta-information lines (##INFO=<...>) are filled in info.
 Remove key names that you do not need in converted RDF.
 Without a configuration file, all values in the INFO field will be used.
 
-#### with docker
+The usage of the `generate config` command is as follows.
+
+```
+USAGE:
+    vcf2rdf generate config [OPTIONS] <FILE>
+
+FLAGS:
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+
+OPTIONS:
+    -a, --assembly <assembly>    Pre-defined assembly [possible values: GRCh37, GRCh38, GRCm38, GRCm39]
+
+ARGS:
+    <FILE>    Path to file to process
+```
+
+
+To convert VCF:
 
 ```shell
-$ docker run --rm -v $(pwd):/work togovar/vcf2rdf vcf2rdf convert -a GRCh37 /work/input.vcf.gz
+$ vcf2rdf convert -c config.yaml input.vcf.gz > output.ttl
+```
+
+The usage of the `convert` command is as follows.
+
+```
+USAGE:
+    vcf2rdf convert [FLAGS] [OPTIONS] <input> --config <config>
+
+FLAGS:
+    -h, --help         Prints help information
+        --rehearsal    Processes only one record and exit
+    -V, --version      Prints version information
+
+OPTIONS:
+    -c, --config <config>      Path to configuration yaml
+    -s, --subject <subject>    Strategy to generate a subject (use blank node if not specified). If use `id`, ensure
+                               that all values at ID column are present and unique [possible values: id, location]
+
+ARGS:
+    <input>    Path to file to process
+```
+
+#### Use docker
+
+```shell
+$ docker run --rm -v $(pwd):/work togovar/vcf2rdf vcf2rdf generate config -a GRCh38 /work/input.vcf.gz > config.yaml
+$ docker run --rm -v $(pwd):/work togovar/vcf2rdf vcf2rdf convert -c /work/config.yaml /work/input.vcf.gz > output.ttl
 ```
