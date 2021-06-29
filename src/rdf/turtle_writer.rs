@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
-use crate::cli::SubjectID;
+use crate::cli::Subject;
 use crate::errors::Result;
 use crate::rdf::namespace::Namespace;
 use crate::rdf::writer::Writer;
@@ -20,7 +20,7 @@ pub struct TurtleWriter<'a, W: Write> {
     state: WriterState,
     namespace: Option<&'a Namespace>,
     info_key: Option<&'a Vec<String>>,
-    pub subject_id: Option<SubjectID>,
+    pub subject_id: Option<Subject>,
 }
 
 #[derive(Debug)]
@@ -63,7 +63,7 @@ impl<'a, W: Write> TurtleWriter<'a, W> {
         self
     }
 
-    pub fn subject_id(&mut self, subject_id: Option<SubjectID>) -> &TurtleWriter<'a, W> {
+    pub fn subject(&mut self, subject_id: Option<Subject>) -> &TurtleWriter<'a, W> {
         self.subject_id = subject_id;
         self
     }

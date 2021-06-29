@@ -25,29 +25,25 @@ pub enum Command {
 
 #[derive(EnumString, EnumVariantNames, Debug)]
 #[strum(serialize_all = "lowercase")]
-pub enum SubjectID {
+pub enum Subject {
     ID,
     Location,
 }
 
 #[derive(StructOpt, Debug)]
 pub struct Convert {
-    /// Assembly. (e.g. GRCh37, GRCh38)
-    #[structopt(short, long)]
-    pub assembly: String, // TODO: Support user's definition
-
     /// Path to configuration yaml.
     #[structopt(short, long, parse(from_os_str))]
-    pub config: Option<PathBuf>,
+    pub config: PathBuf,
 
     /// Processes only one record and exit.
     #[structopt(long)]
     pub rehearsal: bool,
 
-    /// Strategy to generate subject ID (use blank node if not specified).
+    /// Strategy to generate a subject (use blank node if not specified).
     /// If use `id`, ensure that all values at ID column are present and unique.
-    #[structopt(short, long, possible_values = SubjectID::VARIANTS)]
-    pub subject_id: Option<SubjectID>,
+    #[structopt(short, long, possible_values = Subject::VARIANTS)]
+    pub subject: Option<Subject>,
 
     /// Path to file to process.
     #[structopt(parse(from_os_str))]
@@ -64,10 +60,26 @@ pub enum Statistics {
     },
 }
 
+#[derive(EnumString, EnumVariantNames, Debug)]
+pub enum Assembly {
+    #[strum(serialize = "GRCh37")]
+    GRCH37,
+    #[strum(serialize = "GRCh38")]
+    GRCH38,
+    #[strum(serialize = "GRCm38")]
+    GRCM38,
+    #[strum(serialize = "GRCm39")]
+    GRCM39,
+}
+
 #[derive(StructOpt, Debug)]
 pub enum Generate {
     /// Generates config template.
     Config {
+        /// Pre-defined assembly.
+        #[structopt(short, long, possible_values = Assembly::VARIANTS)]
+        assembly: Option<Assembly>,
+
         /// Path to file to process.
         #[structopt(name = "FILE", parse(from_os_str))]
         input: PathBuf,

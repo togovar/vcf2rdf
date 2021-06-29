@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fs::File;
 use std::path::Path;
 
@@ -6,12 +7,19 @@ use serde::{Deserialize, Serialize};
 use crate::errors::Result;
 use crate::rdf::namespace::Namespaces;
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Sequence {
+    pub name: Option<String>,
+    pub reference: Option<String>,
+}
+
 /// A structure for user configuration.
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Configuration {
     pub base: Option<String>,
     pub namespaces: Option<Namespaces>,
     pub info: Option<Vec<String>>,
+    pub reference: BTreeMap<String, Option<Sequence>>,
 }
 
 impl Configuration {

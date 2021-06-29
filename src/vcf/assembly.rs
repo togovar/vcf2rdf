@@ -1,9 +1,4 @@
-use std::convert::TryFrom;
-
-use crate::errors::{Error, Result};
-use crate::vcf::reader::Contig;
 use once_cell::sync::Lazy;
-use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct Sequence<'a> {
@@ -20,6 +15,14 @@ pub struct Assembly<'a> {
     genbank: &'a str,
     refseq: &'a str,
     sequences: Vec<Sequence<'a>>,
+}
+
+impl<'a> Assembly<'a> {
+    pub fn find_sequence(&self, name: &String) -> Option<&Sequence> {
+        self.sequences.iter().find(|&x| {
+            x.name == name || x.genbank == name || x.refseq == name || x.ucsc_name == name
+        })
+    }
 }
 
 macro_rules! sequences {
@@ -108,33 +111,71 @@ static GRCH38_P13: Lazy<Assembly> = Lazy::new(|| Assembly {
     },
 });
 
-impl<'a> TryFrom<&str> for Assembly<'a> {
-    type Error = Error;
+static GRCM38: Lazy<Assembly> = Lazy::new(|| Assembly {
+    name: "GRCm38",
+    genbank: "GCA_000001635.2",
+    refseq: "GCF_000001635.20",
+    sequences: sequences! {
+        ("1", "CM000994.2", "NC_000067.6", "chr1", "https://identifiers.org/refseq/NC_000067.6");
+        ("2", "CM000995.2", "NC_000068.7", "chr2", "https://identifiers.org/refseq/NC_000068.7");
+        ("3", "CM000996.2", "NC_000069.6", "chr3", "https://identifiers.org/refseq/NC_000069.6");
+        ("4", "CM000997.2", "NC_000070.6", "chr4", "https://identifiers.org/refseq/NC_000070.6");
+        ("5", "CM000998.2", "NC_000071.6", "chr5", "https://identifiers.org/refseq/NC_000071.6");
+        ("6", "CM000999.2", "NC_000072.6", "chr6", "https://identifiers.org/refseq/NC_000072.6");
+        ("7", "CM001000.2", "NC_000073.6", "chr7", "https://identifiers.org/refseq/NC_000073.6");
+        ("8", "CM001001.2", "NC_000074.6", "chr8", "https://identifiers.org/refseq/NC_000074.6");
+        ("9", "CM001002.2", "NC_000075.6", "chr9", "https://identifiers.org/refseq/NC_000075.6");
+        ("10", "CM001003.2", "NC_000076.6", "chr10", "https://identifiers.org/refseq/NC_000076.6");
+        ("11", "CM001004.2", "NC_000077.6", "chr11", "https://identifiers.org/refseq/NC_000077.6");
+        ("12", "CM001005.2", "NC_000078.6", "chr12", "https://identifiers.org/refseq/NC_000078.6");
+        ("13", "CM001006.2", "NC_000079.6", "chr13", "https://identifiers.org/refseq/NC_000079.6");
+        ("14", "CM001007.2", "NC_000080.6", "chr14", "https://identifiers.org/refseq/NC_000080.6");
+        ("15", "CM001008.2", "NC_000081.6", "chr15", "https://identifiers.org/refseq/NC_000081.6");
+        ("16", "CM001009.2", "NC_000082.6", "chr16", "https://identifiers.org/refseq/NC_000082.6");
+        ("17", "CM001010.2", "NC_000083.6", "chr17", "https://identifiers.org/refseq/NC_000083.6");
+        ("18", "CM001011.2", "NC_000084.6", "chr18", "https://identifiers.org/refseq/NC_000084.6");
+        ("19", "CM001012.2", "NC_000085.6", "chr19", "https://identifiers.org/refseq/NC_000085.6");
+        ("X", "CM001013.2", "NC_000086.7", "chrX", "https://identifiers.org/refseq/NC_000086.7");
+        ("Y", "CM001014.2", "NC_000087.7", "chrY", "https://identifiers.org/refseq/NC_000087.7");
+    },
+});
 
-    fn try_from(str: &str) -> Result<Self, Self::Error> {
-        match str.to_lowercase().as_str() {
-            "grch37" | "grch37.p13" => Ok(GRCH37_P13.clone()),
-            "grch38" | "grch38.p13" => Ok(GRCH38_P13.clone()),
-            x => Err(Error::UnsupportedAssemblyError(x.to_string())),
+static GRCM39: Lazy<Assembly> = Lazy::new(|| Assembly {
+    name: "GRCm39",
+    genbank: "GCA_000001635.9",
+    refseq: "GCF_000001635.27",
+    sequences: sequences! {
+        ("1", "CM000994.3", "NC_000067.7", "chr1", "https://identifiers.org/refseq/NC_000067.7");
+        ("2", "CM000995.3", "NC_000068.8", "chr2", "https://identifiers.org/refseq/NC_000068.8");
+        ("3", "CM000996.3", "NC_000069.7", "chr3", "https://identifiers.org/refseq/NC_000069.7");
+        ("4", "CM000997.3", "NC_000070.7", "chr4", "https://identifiers.org/refseq/NC_000070.7");
+        ("5", "CM000998.3", "NC_000071.7", "chr5", "https://identifiers.org/refseq/NC_000071.7");
+        ("6", "CM000999.3", "NC_000072.7", "chr6", "https://identifiers.org/refseq/NC_000072.7");
+        ("7", "CM001000.3", "NC_000073.7", "chr7", "https://identifiers.org/refseq/NC_000073.7");
+        ("8", "CM001001.3", "NC_000074.7", "chr8", "https://identifiers.org/refseq/NC_000074.7");
+        ("9", "CM001002.3", "NC_000075.7", "chr9", "https://identifiers.org/refseq/NC_000075.7");
+        ("10", "CM001003.3", "NC_000076.7", "chr10", "https://identifiers.org/refseq/NC_000076.7");
+        ("11", "CM001004.3", "NC_000077.7", "chr11", "https://identifiers.org/refseq/NC_000077.7");
+        ("12", "CM001005.3", "NC_000078.7", "chr12", "https://identifiers.org/refseq/NC_000078.7");
+        ("13", "CM001006.3", "NC_000079.7", "chr13", "https://identifiers.org/refseq/NC_000079.7");
+        ("14", "CM001007.3", "NC_000080.7", "chr14", "https://identifiers.org/refseq/NC_000080.7");
+        ("15", "CM001008.3", "NC_000081.7", "chr15", "https://identifiers.org/refseq/NC_000081.7");
+        ("16", "CM001009.3", "NC_000082.7", "chr16", "https://identifiers.org/refseq/NC_000082.7");
+        ("17", "CM001010.3", "NC_000083.7", "chr17", "https://identifiers.org/refseq/NC_000083.7");
+        ("18", "CM001011.3", "NC_000084.7", "chr18", "https://identifiers.org/refseq/NC_000084.7");
+        ("19", "CM001012.3", "NC_000085.7", "chr19", "https://identifiers.org/refseq/NC_000085.7");
+        ("X", "CM001013.3", "NC_000086.8", "chrX", "https://identifiers.org/refseq/NC_000086.8");
+        ("Y", "CM001014.3", "NC_000087.8", "chrY", "https://identifiers.org/refseq/NC_000087.8");
+    },
+});
+
+impl<'a> From<&crate::cli::Assembly> for Assembly<'a> {
+    fn from(assembly: &crate::cli::Assembly) -> Self {
+        match assembly {
+            crate::cli::Assembly::GRCH37 => GRCH37_P13.clone(),
+            crate::cli::Assembly::GRCH38 => GRCH38_P13.clone(),
+            crate::cli::Assembly::GRCM38 => GRCM38.clone(),
+            crate::cli::Assembly::GRCM39 => GRCM39.clone(),
         }
-    }
-}
-
-impl<'a> Assembly<'a> {
-    pub fn map_from(&self, contig: &Vec<Contig>) -> HashMap<u32, Sequence> {
-        let mut m = HashMap::new();
-
-        for c in contig {
-            if let Some(x) = self.sequences.iter().find(|&x| {
-                x.name == c.name
-                    || x.genbank == c.name
-                    || x.refseq == c.name
-                    || x.ucsc_name == c.name
-            }) {
-                m.insert(c.rid, x.clone());
-            }
-        }
-
-        m
     }
 }

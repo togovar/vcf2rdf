@@ -2,14 +2,14 @@ use std::io::Write;
 
 use rust_htslib::bcf;
 
-use crate::cli::SubjectID;
+use crate::cli::Subject;
 use crate::errors::Result;
 use crate::rdf::turtle_writer::{AsTurtle, TurtleWriter};
 use crate::vcf::alteration::AlterationPosition;
 use crate::vcf::reader::InfoValue;
 use crate::vcf::record::Record;
 
-const BUFFER_DEFAULT: usize = 40_960;
+const BUFFER_DEFAULT: usize = 40 * 1024;
 
 struct Buffer {
     string: String,
@@ -93,16 +93,18 @@ impl<W: Write> AsTurtle<W> for Record<'_> {
 impl Record<'_> {
     fn write_subject<W: Write>(&self, wtr: &TurtleWriter<W>, buf: &mut Buffer) {
         match &wtr.subject_id {
-            Some(SubjectID::ID) => {
+            Some(Subject::ID) => {
                 let id = unsafe { String::from_utf8_unchecked(self.inner.id()) };
                 buf.push_iri(&id);
             }
-            Some(SubjectID::Location) => {
+            Some(Subject::Location) => {
                 let alt = self.alteration;
 
                 buf.push_str("<");
-                buf.push_str(self.sequence.name);
-                buf.push_str("-");
+                if let Some(ref name) = self.sequence.name {
+                    buf.push_str(name.as_str());
+                    buf.push_str("-");
+                }
                 buf.push_str(alt.position.to_string().as_str());
                 buf.push_str("-");
                 buf.push_str(alt.reference);
@@ -123,8 +125,10 @@ impl Record<'_> {
                 buf.push_str("\n    a faldo:ExactPosition ;");
                 buf.push_str("\n    faldo:position ");
                 buf.push_str(p.to_string().as_str());
-                buf.push_str(" ;\n    faldo:reference ");
-                buf.push_iri(self.sequence.reference);
+                if let Some(ref reference) = self.sequence.reference {
+                    buf.push_str(" ;\n    faldo:reference ");
+                    buf.push_iri(reference.as_str());
+                }
             }
             AlterationPosition::Deletion(begin, end) | AlterationPosition::Indel(begin, end) => {
                 buf.push_str("\n    a faldo:Region ;");
@@ -134,9 +138,10 @@ impl Record<'_> {
                 buf.push_str((begin - 1).to_string().as_str());
                 buf.push_str(" ;\n      faldo:before ");
                 buf.push_str(begin.to_string().as_str());
-                buf.push_str(" ;");
-                buf.push_str("\n      faldo:reference ");
-                buf.push_iri(self.sequence.reference);
+                if let Some(ref reference) = self.sequence.reference {
+                    buf.push_str(" ;\n    faldo:reference ");
+                    buf.push_iri(reference.as_str());
+                }
                 buf.push_str("\n    ] ;");
 
                 buf.push_str("\n    faldo:end [");
@@ -145,8 +150,10 @@ impl Record<'_> {
                 buf.push_str(end.to_string().as_str());
                 buf.push_str(" ;\n      faldo:before ");
                 buf.push_str((end + 1).to_string().as_str());
-                buf.push_str(" ;\n      faldo:reference ");
-                buf.push_iri(self.sequence.reference);
+                if let Some(ref reference) = self.sequence.reference {
+                    buf.push_str(" ;\n    faldo:reference ");
+                    buf.push_iri(reference.as_str());
+                }
                 buf.push_str("\n    ]");
             }
             AlterationPosition::Insertion(begin, end) => {
@@ -155,8 +162,10 @@ impl Record<'_> {
                 buf.push_str(begin.to_string().as_str());
                 buf.push_str(" ;\n    faldo:before ");
                 buf.push_str(end.to_string().as_str());
-                buf.push_str(" ;\n    faldo:reference ");
-                buf.push_iri(self.sequence.reference);
+                if let Some(ref reference) = self.sequence.reference {
+                    buf.push_str(" ;\n    faldo:reference ");
+                    buf.push_iri(reference.as_str());
+                }
             }
             AlterationPosition::MNV(begin, end) => {
                 buf.push_str("\n    a faldo:Region ;");
@@ -164,8 +173,10 @@ impl Record<'_> {
                 buf.push_str(begin.to_string().as_str());
                 buf.push_str(" ;\n    faldo:end ");
                 buf.push_str(end.to_string().as_str());
-                buf.push_str(" ;\n    faldo:reference ");
-                buf.push_iri(self.sequence.reference);
+                if let Some(ref reference) = self.sequence.reference {
+                    buf.push_str(" ;\n    faldo:reference ");
+                    buf.push_iri(reference.as_str());
+                }
             }
         };
         buf.push_str("\n  ]");
