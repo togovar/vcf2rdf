@@ -5,6 +5,7 @@ use structopt::clap::crate_description;
 use structopt::StructOpt;
 use strum::{EnumString, EnumVariantNames, VariantNames};
 
+pub mod compressor;
 pub mod configuration;
 pub mod converter;
 pub mod generator;
@@ -13,6 +14,9 @@ pub mod statistics;
 #[derive(StructOpt, Debug)]
 #[structopt(about = crate_description!())]
 pub enum Command {
+    /// Compress vcf to BGZF.
+    Compress(Compress),
+
     /// Converts VCF to RDF.
     Convert(Convert),
 
@@ -70,6 +74,17 @@ pub enum Assembly {
     GRCM38,
     #[strum(serialize = "GRCm39")]
     GRCM39,
+}
+
+#[derive(StructOpt, Debug)]
+pub struct Compress {
+    /// Generate tabix index.
+    #[structopt(long)]
+    pub tabix: bool,
+
+    /// Path to file to process.
+    #[structopt(parse(from_os_str))]
+    pub input: PathBuf,
 }
 
 #[derive(StructOpt, Debug)]
