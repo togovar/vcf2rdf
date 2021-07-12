@@ -39,4 +39,10 @@ pub enum Error {
 
     #[error("Unsupported assembly version: {0}")]
     UnsupportedAssemblyError(String),
+
+    #[error("The compression of {0} is not BGZF")]
+    NotBgzipFileError(String),
+
+    #[error("tbx_index_build failed: {0}")]
+    IndexBuildFailedError(String),
 }

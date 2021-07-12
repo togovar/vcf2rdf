@@ -1,15 +1,14 @@
 //! Module for working with bgzip and tabix
 use std::ffi;
 use std::fs::File;
-use std::io::{BufRead, BufReader, BufWriter, Write};
+use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
-use anyhow::anyhow;
 use bgzip::BGZFWriter;
 use flate2;
 use rust_htslib::htslib;
 
-use crate::errors::Result;
+use crate::errors::{Error, Result};
 
 /// Compress input file to bgzip
 ///
@@ -59,17 +58,15 @@ pub fn from_reader<R: BufRead, P: AsRef<Path>>(
     level: Option<u32>,
     tabix: bool,
 ) -> Result<()> {
-    let mut buf = Vec::<u8>::new();
+    let file = File::create(&output)?;
 
-    let mut file = BufWriter::new(File::create(&output)?);
-    let mut writer = BGZFWriter::new(&mut file, flate2::Compression::new(level.unwrap_or(6)));
-
-    while reader.read_until(b'\n', &mut buf)? != 0 {
-        writer.write_all(buf.as_ref())?;
-        buf.clear();
-    }
-
-    writer.close()?;
+    let mut writer = BGZFWriter::new(
+        file,
+        level.map_or(flate2::Compression::default(), |n| {
+            flate2::Compression::new(n)
+        }),
+    );
+    std::io::copy(reader, &mut writer)?;
 
     if tabix {
         crate::util::vcf::compress::tabix(&output)?;
@@ -111,14 +108,13 @@ pub fn tabix<P: AsRef<Path>>(input: P) -> Result<()> {
             if ret == 0 {
                 Ok(())
             } else if ret == -2 {
-                Err(anyhow!("[tabix] the compression of {} is not BGZF", path))
+                Err(Error::NotBgzipFileError(path.to_string()))?
             } else {
-                Err(anyhow!("tbx_index_build failed: {}", path))
+                Err(Error::IndexBuildFailedError(path.to_string()))?
             }
         }
-        None => Err(anyhow!(
-            "the path may contains invalid UTF-8 characters: {}",
-            input.as_ref().display()
-        )),
+        None => Err(Error::FilePathError(
+            input.as_ref().to_string_lossy().to_string(),
+        ))?,
     }
 }
