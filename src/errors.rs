@@ -43,6 +43,18 @@ pub enum Error {
     #[error("The compression of {0} is not BGZF")]
     NotBgzipFileError(String),
 
+    #[error("Can't create {0}")]
+    BgzipCreateError(String),
+
+    #[error("Close failed")]
+    BgzipCloseError,
+
+    #[error("Could not write {0} bytes")]
+    BgzipWriteError(usize),
+
+    #[error("Could not write index to {0}")]
+    IndexWriteError(String),
+
     #[error("tbx_index_build failed: {0}")]
     IndexBuildFailedError(String),
 }

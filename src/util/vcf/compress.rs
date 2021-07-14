@@ -1,14 +1,15 @@
 //! Module for working with bgzip and tabix
 use std::ffi;
+use std::ffi::CString;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
-use bgzip::BGZFWriter;
-use flate2;
 use rust_htslib::htslib;
 
 use crate::errors::{Error, Result};
+
+const WINDOW_SIZE: usize = 64 * 1024;
 
 /// Compress input file to bgzip
 ///
@@ -16,7 +17,7 @@ use crate::errors::{Error, Result};
 ///
 /// * `input` - Path to input VCF.
 /// * `level` - Compression level to use when compressing. From `Some(0)` (Faster) to `Some(9)` (Best). Set `None` for default level.
-/// * `tabix` - Whether if to generate `.tbi` index or not.
+/// * `index` - Whether if to generate `.tbi` index or not.
 ///
 /// # Example
 /// ```no_run
@@ -24,15 +25,12 @@ use crate::errors::{Error, Result};
 /// compress::from_path("path/to/your.vcf", None, true);
 /// // => to be stored at path/to/your.vcf.gz
 /// ```
-pub fn from_path<P: AsRef<Path>>(input: P, level: Option<u32>, tabix: bool) -> Result<PathBuf> {
-    let mut reader = BufReader::new(File::open(&input)?);
-
+pub fn from_path<P: AsRef<Path>>(input: P, level: Option<u8>, index: bool) -> Result<()> {
+    let mut reader = BufReader::with_capacity(WINDOW_SIZE, File::open(&input)?);
     let mut output = PathBuf::from(input.as_ref());
     output.set_extension("vcf.gz");
 
-    from_reader(&mut reader, &output, level, tabix)?;
-
-    Ok(output)
+    from_reader(&mut reader, output, level, index)
 }
 
 /// Compress read content to bgzip
@@ -42,7 +40,7 @@ pub fn from_path<P: AsRef<Path>>(input: P, level: Option<u32>, tabix: bool) -> R
 /// * `reader` - An object that implements `BufRead`.
 /// * `output` - Path to output VCF.
 /// * `level` - Compression level to use when compressing. From `Some(0)` (Faster) to `Some(9)` (Best). Set `None` for default level.
-/// * `tabix` - Whether if to generate `.tbi` index or not.
+/// * `index` - Whether if to generate `.tbi` index or not.
 ///
 /// Example:
 /// ```no_run
@@ -55,21 +53,60 @@ pub fn from_path<P: AsRef<Path>>(input: P, level: Option<u32>, tabix: bool) -> R
 pub fn from_reader<R: BufRead, P: AsRef<Path>>(
     reader: &mut R,
     output: P,
-    level: Option<u32>,
-    tabix: bool,
+    level: Option<u8>,
+    index: bool,
 ) -> Result<()> {
-    let file = File::create(&output)?;
+    let mut out_mode = Vec::new();
+    out_mode.push(b'w');
+    match level {
+        Some(n) if n <= 9 => out_mode.push(n + b'0'),
+        _ => out_mode.push(b'/'),
+    };
 
-    let mut writer = BGZFWriter::new(
-        file,
-        level.map_or(flate2::Compression::default(), |n| {
-            flate2::Compression::new(n)
-        }),
-    );
-    std::io::copy(reader, &mut writer)?;
+    let path = output.as_ref().to_str().ok_or(Error::FilePathError(
+        output.as_ref().to_string_lossy().to_string(),
+    ))?;
 
-    if tabix {
-        crate::util::vcf::compress::tabix(&output)?;
+    let fp: *mut htslib::BGZF = unsafe {
+        htslib::bgzf_open(
+            CString::new(path)?.as_ptr(),
+            CString::new(out_mode)?.as_ptr(),
+        )
+    };
+
+    if fp.is_null() {
+        Err(Error::BgzipCreateError(
+            output.as_ref().to_string_lossy().to_string(),
+        ))?
+    }
+
+    while let Ok(buffer) = reader.fill_buf() {
+        let length = buffer.len();
+        if length == 0 {
+            break;
+        }
+
+        let ret = unsafe {
+            htslib::bgzf_write(
+                fp,
+                buffer.as_ptr() as *const std::os::raw::c_void,
+                length as u64,
+            )
+        };
+
+        if ret < 0 {
+            Err(Error::BgzipWriteError(length))?
+        }
+
+        reader.consume(length);
+    }
+
+    if unsafe { htslib::bgzf_close(fp) } < 0 {
+        Err(Error::BgzipCloseError)?
+    };
+
+    if index {
+        tabix(&output)?;
     }
 
     Ok(())
