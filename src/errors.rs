@@ -1,9 +1,22 @@
 //! Module for defining errors for this application
-pub use anyhow::Result;
 use thiserror::Error;
+
+pub type Result<T, E = Error> = core::result::Result<T, E>;
 
 #[derive(Debug, Error)]
 pub enum Error {
+    #[error(transparent)]
+    IOError(#[from] std::io::Error),
+
+    #[error(transparent)]
+    RustHtslibError(#[from] rust_htslib::errors::Error),
+
+    #[error(transparent)]
+    NulError(#[from] std::ffi::NulError),
+
+    #[error(transparent)]
+    SerdeYamlError(#[from] serde_yaml::Error),
+
     #[error("argument error: {0}")]
     ArgumentError(String),
 
