@@ -1,3 +1,5 @@
+use log::*;
+
 use crate::cli::configuration::{Configuration, Sequence};
 use crate::cli::Convert;
 use crate::errors::{Error, Result};
@@ -29,6 +31,17 @@ pub fn run(options: Convert) -> Result<()> {
             .map_or(0, |x| x.rid as usize);
 
         let mut vec = vec![None; max + 1];
+
+        if config
+            .reference
+            .values()
+            .any(|x| x.as_ref().map_or(true, |y| y.reference.is_none()))
+        {
+            warn!(
+                "Some reference of sequences are empty. Records on these chromosomes are ignored."
+            )
+        }
+
         for c in contig {
             vec[c.rid as usize] = config.reference.get(&c.name).unwrap().to_owned();
         }

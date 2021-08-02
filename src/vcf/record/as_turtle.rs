@@ -42,7 +42,11 @@ impl Buffer {
 }
 
 impl<W: Write> AsTurtle<W> for Record<'_> {
-    fn as_ttl_string(&self, wtr: &TurtleWriter<W>) -> Result<String> {
+    fn as_ttl_string(&self, wtr: &TurtleWriter<W>) -> Result<Option<String>> {
+        if self.sequence.reference.is_none() {
+            return Ok(None);
+        }
+
         let mut buf = Buffer::default();
 
         let id = unsafe { String::from_utf8_unchecked(self.inner.id()) };
@@ -86,7 +90,7 @@ impl<W: Write> AsTurtle<W> for Record<'_> {
 
         buf.push_str(" .\n\n");
 
-        Ok(buf.string)
+        Ok(Some(buf.string))
     }
 }
 

@@ -9,7 +9,7 @@ use crate::rdf::writer::Writer;
 use crate::vcf::record::Record;
 
 pub trait AsTurtle<W> {
-    fn as_ttl_string(&self, wtr: &TurtleWriter<W>) -> Result<String>
+    fn as_ttl_string(&self, wtr: &TurtleWriter<W>) -> Result<Option<String>>
     where
         W: Write;
 }
@@ -101,8 +101,10 @@ impl<'a, W: Write> Writer for TurtleWriter<'a, W> {
             self.state.header = HeaderState::DidWrite;
         }
 
-        Ok(self
-            .wtr
-            .write_all(record.as_ttl_string(&self)?.as_bytes())?)
+        if let Some(r) = record.as_ttl_string(&self)? {
+            self.wtr.write_all(r.as_bytes())?;
+        }
+
+        Ok(())
     }
 }

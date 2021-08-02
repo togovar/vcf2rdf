@@ -5,6 +5,8 @@ use vcf2rdf::cli::{compressor, converter, generator, statistics, Command};
 use vcf2rdf::errors::Result;
 
 fn main() -> Result<()> {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn")).init();
+
     let command: Command = Command::from_args();
 
     match command {
