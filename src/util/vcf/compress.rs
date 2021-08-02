@@ -22,13 +22,25 @@ const WINDOW_SIZE: usize = 64 * 1024;
 /// # Example
 /// ```no_run
 /// use vcf2rdf::util::vcf::compress;
-/// compress::from_path("path/to/your.vcf", None, true);
+/// compress::from_path("path/to/your.vcf", None, None, true);
 /// // => to be stored at path/to/your.vcf.gz
 /// ```
-pub fn from_path<P: AsRef<Path>>(input: P, level: Option<u8>, index: bool) -> Result<()> {
+pub fn from_path<P: AsRef<Path>>(
+    input: P,
+    output: Option<P>,
+    level: Option<u8>,
+    index: bool,
+) -> Result<()> {
+    let mut i = PathBuf::from(input.as_ref());
+    let output = match &output {
+        Some(path) => path.as_ref(),
+        None => {
+            i.set_extension("vcf.gz");
+            i.as_path()
+        }
+    };
+
     let mut reader = BufReader::with_capacity(WINDOW_SIZE, File::open(&input)?);
-    let mut output = PathBuf::from(input.as_ref());
-    output.set_extension("vcf.gz");
 
     from_reader(&mut reader, output, level, index)
 }

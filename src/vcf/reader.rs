@@ -1,12 +1,17 @@
 use std::collections::HashMap;
 use std::ffi::{CString, OsString};
 use std::fmt::{Display, Formatter};
+use std::fs::File;
+use std::io;
+use std::io::{BufRead, BufWriter, Write};
 use std::path::{Path, PathBuf};
 
+use log::*;
 use rust_htslib::bcf;
 use rust_htslib::bcf::Read;
 use rust_htslib::errors::Error as htslib_error;
 use rust_htslib::htslib;
+use tempfile::TempDir;
 
 use crate::errors::{Error, Result};
 use crate::vcf::info::InfoKeys;
@@ -15,15 +20,16 @@ use crate::vcf::info::InfoKeys;
 pub struct Reader {
     reader: bcf::Reader,
     tbx: *mut htslib::tbx_t,
+    temp_dir: Option<TempDir>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct Contig {
     pub rid: u32,
     pub name: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum InfoValue {
     Flag(bool),
     Integer(i32),
@@ -45,10 +51,12 @@ pub struct Info<'a> {
     pub length: bcf::header::TagLength,
 }
 
+const FILENAME_STDIN: &'static str = "stdin.vcf";
+
 impl Reader {
     pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
         match path.as_ref().to_str() {
-            Some(p) if path.as_ref().exists() => Self::new(p),
+            Some(p) if path.as_ref().exists() => Self::new(p, None),
             Some(p) if !path.as_ref().exists() => Err(Error::FileNotFoundError(p.to_string()))?,
             _ => Err(Error::FilePathError(
                 path.as_ref().to_string_lossy().to_string(),
@@ -56,7 +64,38 @@ impl Reader {
         }
     }
 
-    pub fn new(path: &str) -> Result<Self> {
+    pub fn from_stdin() -> Result<Self> {
+        let stdin = io::stdin();
+        let handle = stdin.lock();
+
+        Self::from_reader(handle)
+    }
+
+    pub fn from_reader<R: BufRead>(mut reader: R) -> Result<Self> {
+        let tmp_dir = TempDir::new()?;
+        debug!("Create temporary directory: {:?}", tmp_dir);
+
+        let tmp_file = tmp_dir.path().join(FILENAME_STDIN);
+
+        let mut writer = BufWriter::new(File::create(&tmp_file)?);
+        let mut buf = Vec::new();
+
+        debug!("Reading contents from stdin...");
+        while reader.read_until(b'\n', &mut buf)? != 0 {
+            writer.write_all(buf.as_ref())?;
+            buf.clear();
+        }
+        writer.flush()?;
+        debug!("Contents from stdin stored to {:?}", tmp_file);
+
+        match tmp_file.to_str() {
+            Some(p) if tmp_file.exists() => Self::new(p, Some(tmp_dir)),
+            Some(p) => Err(Error::FileNotFoundError(p.to_string())),
+            None => Err(Error::FilePathError(tmp_file.to_string_lossy().to_string())),
+        }
+    }
+
+    pub fn new(path: &str, temp_dir: Option<TempDir>) -> Result<Self> {
         if let Some(p) = Reader::tbi_path(path) {
             if !p.exists() {
                 Err(Error::IndexNotFoundError(p.to_string_lossy().to_string()))?;
@@ -73,6 +112,7 @@ impl Reader {
         Ok(Reader {
             reader: rust_htslib::bcf::Reader::from_path(path)?,
             tbx,
+            temp_dir,
         })
     }
 

@@ -4,3 +4,4 @@ pub mod assembly;
 pub mod info;
 pub mod reader;
 pub mod record;
+pub mod tabix;
