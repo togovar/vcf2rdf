@@ -14,7 +14,7 @@ pub mod statistics;
 #[derive(StructOpt, Debug)]
 #[structopt(about = crate_description!())]
 pub enum Command {
-    /// Compress vcf to BGZF.
+    /// Compress VCF to BGZF.
     Compress(Compress),
 
     /// Converts VCF to RDF.
