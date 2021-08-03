@@ -31,8 +31,20 @@ jobs:
         id: docker_build
         uses: docker/build-push-action@v2
         with:
+          file: docker/slim-buster/Dockerfile
           push: true
-          tags: togovar/vcf2rdf:latest, togovar/vcf2rdf:${{ steps.tag.outputs.group1 }}
+          tags: togovar/vcf2rdf:latest, togovar/vcf2rdf:${{ steps.tag.outputs.group1 }}, togovar/vcf2rdf:${{ steps.tag.outputs.group1 }}-slim, togovar/vcf2rdf:${{ steps.tag.outputs.group1 }}-slim-buster
 
       - name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
+
+      - name: Build and push
+        id: docker_build_alpine
+        uses: docker/build-push-action@v2
+        with:
+          file: docker/alpine/Dockerfile
+          push: true
+          tags: togovar/vcf2rdf:alpine, togovar/vcf2rdf:${{ steps.tag.outputs.group1 }}-alpine
+
+      - name: Image digest
+        run: echo ${{ steps.docker_build_alpine.outputs.digest }}

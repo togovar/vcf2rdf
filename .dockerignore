@@ -1,7 +1,7 @@
 /.git
 /.github
+/docker
 /target
 /tmp
 .dockerignore
 .gitignore
-Dockerfile
