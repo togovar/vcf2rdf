@@ -1,4 +1,6 @@
 //! Executable for converting VCF to RDF.
+use std::process::exit;
+
 use structopt::StructOpt;
 
 use vcf2rdf::cli::{compressor, converter, generator, statistics, Command};
@@ -9,10 +11,17 @@ fn main() -> Result<()> {
 
     let command: Command = Command::from_args();
 
-    match command {
+    let ret = match command {
         Command::Compress(opts) => compressor::run(opts),
         Command::Convert(opts) => converter::run(opts),
         Command::Stat(cmd) => statistics::run(cmd),
         Command::Generate(cmd) => generator::run(cmd),
+    };
+
+    if let Err(err) = ret {
+        eprintln!("Error: {}", err);
+        exit(1);
     }
+
+    Ok(())
 }
