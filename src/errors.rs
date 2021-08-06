@@ -46,4 +46,7 @@ pub enum Error {
 
     #[error("tbx_index_build failed: {0}")]
     IndexBuildFailedError(String),
+
+    #[error("Missing configuration: {0}")]
+    ConfigurationNotFoundError(String),
 }

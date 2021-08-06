@@ -43,7 +43,11 @@ pub fn run(options: Convert) -> Result<()> {
         }
 
         for c in contig {
-            vec[c.rid as usize] = config.reference.get(&c.name).unwrap().to_owned();
+            vec[c.rid as usize] = config
+                .reference
+                .get(&c.name)
+                .ok_or(Error::ConfigurationNotFoundError(c.name.to_owned()))?
+                .to_owned();
         }
 
         vec
