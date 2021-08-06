@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 
+## [1.0.0-beta.5] - 2021-08-06
+### Changed
+- Do not output identifier if value of `ID` column is "."
+
 ## [1.0.0-beta.4] - 2021-08-03
 ### Added
 - Add `Dockerfile` for alpine
@@ -20,7 +24,8 @@ All notable changes to this project will be documented in this file.
 ### Implemented
 - Initial version of converter
 
-[Unreleased]: https://github.com/togovar/vcf2rdf/compare/v1.0.0-beta.4...HEAD
+[Unreleased]: https://github.com/togovar/vcf2rdf/compare/v1.0.0-beta.5...HEAD
+[1.0.0-beta.5]: https://github.com/togovar/vcf2rdf/releases/tag/v1.0.0-beta.5
 [1.0.0-beta.4]: https://github.com/togovar/vcf2rdf/releases/tag/v1.0.0-beta.4
 [1.0.0-beta.3]: https://github.com/togovar/vcf2rdf/releases/tag/v1.0.0-beta.3
 [1.0.0-beta.2]: https://github.com/togovar/vcf2rdf/releases/tag/v1.0.0-beta.2
