@@ -58,8 +58,10 @@ impl<W: Write> AsTurtle<W> for Record<'_> {
         buf.push_str(" a gvo:");
         buf.push_str(self.alteration.normalized_position.to_str());
 
-        buf.push_str(" ;\n  dct:identifier ");
-        buf.push_quoted(&id, '"');
+        if id != "." {
+            buf.push_str(" ;\n  dct:identifier ");
+            buf.push_quoted(&id, '"');
+        }
 
         self.write_location(&mut buf);
 
