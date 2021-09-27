@@ -264,8 +264,24 @@ impl Record<'_> {
                 buf.push_str(x.to_string().as_str());
             }
             InfoValue::String(str) => {
-                buf.push_quoted(str, '"');
+                if str.contains("%") {
+                    buf.push_quoted(Self::percent_decode(str).as_str(), '"');
+                } else {
+                    buf.push_quoted(str, '"');
+                }
             }
         };
+    }
+
+    fn percent_decode<T: AsRef<str>>(str: T) -> String {
+        str.as_ref()
+            .replace("%3A", ":")
+            .replace("%3B", ";")
+            .replace("%3D", "=")
+            .replace("%25", "%")
+            .replace("%2C", ",")
+            .replace("%0D", "\r")
+            .replace("%0A", "\n")
+            .replace("%09", "\t")
     }
 }
