@@ -374,4 +374,19 @@ mod tests {
             String::from_utf8_unchecked(vec.to_vec())
         });
     }
+
+    #[test]
+    fn test_read_missing_reference() {
+        let records = read_vcf_as_vec("test/visc_spec.vcf.gz");
+
+        assert_eq!(records[3].alleles(), vec![b".", b"T"]);
+    }
+
+    #[test]
+    fn test_read_missing_alternate() {
+        let records = read_vcf_as_vec("test/visc_spec.vcf.gz");
+
+        assert_eq!(records[5].alleles(), vec![b"T", b"."]);
+        assert_eq!(records[6].alleles(), vec![b"T"]);
+    }
 }

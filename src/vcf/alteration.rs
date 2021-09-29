@@ -26,8 +26,11 @@ impl AlterationPosition {
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Serialize)]
 pub struct Alteration<'a> {
+    #[deprecated(note = "use normalized_position, instead.")]
     pub position: i64,
+    #[deprecated(note = "use normalized_reference, instead.")]
     pub reference: &'a str,
+    #[deprecated(note = "use normalized_alternate, instead.")]
     pub alternate: &'a str,
     pub normalized_position: AlterationPosition,
     pub normalized_reference: &'a str,
@@ -36,10 +39,15 @@ pub struct Alteration<'a> {
 
 impl<'a> Alteration<'a> {
     pub fn from_record(record: &'a Record) -> Vec<Result<Alteration>> {
-        let reference = record.alleles()[0];
+        let mut alleles = record.alleles();
 
-        record
-            .alleles()
+        let reference = alleles[0];
+
+        if alleles.len() == 1 {
+            alleles.push(b".");
+        }
+
+        alleles
             .iter()
             .skip(1)
             .map(|&x| {
@@ -67,6 +75,15 @@ impl<'a> Alteration<'a> {
         reference: &'a str,
         alternate: &'a str,
     ) -> Result<(AlterationPosition, &'a str, &'a str)> {
+        let reference = match reference {
+            "." => "",
+            x => x,
+        };
+        let alternate = match alternate {
+            "." => "",
+            x => x,
+        };
+
         let (reference, alternate, n) = Self::remove_shared_nucleotide(reference, alternate);
 
         match (reference.len(), alternate.len()) {
@@ -163,6 +180,20 @@ mod tests {
         assert_eq!(n_alt, "");
 
         let (n_pos, n_ref, n_alt) =
+            Alteration::normalize(1001, "T", "").expect("Error normalizing alteration.");
+
+        assert_eq!(n_pos, AlterationPosition::Deletion(1001, 1001));
+        assert_eq!(n_ref, "T");
+        assert_eq!(n_alt, "");
+
+        let (n_pos, n_ref, n_alt) =
+            Alteration::normalize(1001, "T", ".").expect("Error normalizing alteration.");
+
+        assert_eq!(n_pos, AlterationPosition::Deletion(1001, 1001));
+        assert_eq!(n_ref, "T");
+        assert_eq!(n_alt, "");
+
+        let (n_pos, n_ref, n_alt) =
             Alteration::normalize(1000, "ACTC", "AC").expect("Error normalizing alteration.");
 
         assert_eq!(n_pos, AlterationPosition::Deletion(1002, 1003));
@@ -174,6 +205,20 @@ mod tests {
     fn test_normalize_insertion() {
         let (n_pos, n_ref, n_alt) =
             Alteration::normalize(1000, "C", "CT").expect("Error normalizing alteration.");
+
+        assert_eq!(n_pos, AlterationPosition::Insertion(1000, 1001));
+        assert_eq!(n_ref, "");
+        assert_eq!(n_alt, "T");
+
+        let (n_pos, n_ref, n_alt) =
+            Alteration::normalize(1001, "", "T").expect("Error normalizing alteration.");
+
+        assert_eq!(n_pos, AlterationPosition::Insertion(1000, 1001));
+        assert_eq!(n_ref, "");
+        assert_eq!(n_alt, "T");
+
+        let (n_pos, n_ref, n_alt) =
+            Alteration::normalize(1001, ".", "T").expect("Error normalizing alteration.");
 
         assert_eq!(n_pos, AlterationPosition::Insertion(1000, 1001));
         assert_eq!(n_ref, "");
