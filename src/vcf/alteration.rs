@@ -70,7 +70,7 @@ impl<'a> Alteration<'a> {
             .collect()
     }
 
-    fn normalize(
+    pub fn normalize(
         pos: i64,
         reference: &'a str,
         alternate: &'a str,
