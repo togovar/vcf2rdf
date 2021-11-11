@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use crate::cli::configuration::Configuration;
 
@@ -11,32 +11,30 @@ const RDF: &str = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
 const RDFS: &str = "http://www.w3.org/2000/01/rdf-schema#";
 const SIO: &str = "http://semanticscience.org/resource/";
 
-pub type Namespaces = HashMap<String, String>;
-
 /// RDF namespace.
 #[derive(Debug)]
 pub struct Namespace {
     pub base: Option<String>,
-    pub namespaces: Namespaces,
+    pub prefixes: BTreeMap<String, String>,
 }
 
 impl Default for Namespace {
     /// Default for `Namespace`
     fn default() -> Self {
-        let mut m: HashMap<String, String> = HashMap::new();
+        let mut prefixes = BTreeMap::new();
 
-        m.insert(String::from("dct"), DCT.to_string());
-        m.insert(String::from("faldo"), FALDO.to_string());
-        m.insert(String::from("gvo"), GVO.to_string());
-        m.insert(String::from("hco"), HCO.to_string());
-        m.insert(String::from("obo"), OBO.to_string());
-        m.insert(String::from("rdf"), RDF.to_string());
-        m.insert(String::from("rdfs"), RDFS.to_string());
-        m.insert(String::from("sio"), SIO.to_string());
+        prefixes.insert("dct".to_owned(), DCT.to_owned());
+        prefixes.insert("faldo".to_owned(), FALDO.to_owned());
+        prefixes.insert("gvo".to_owned(), GVO.to_owned());
+        prefixes.insert("hco".to_owned(), HCO.to_owned());
+        prefixes.insert("obo".to_owned(), OBO.to_owned());
+        prefixes.insert("rdf".to_owned(), RDF.to_owned());
+        prefixes.insert("rdfs".to_owned(), RDFS.to_owned());
+        prefixes.insert("sio".to_owned(), SIO.to_owned());
 
         Namespace {
             base: None,
-            namespaces: m,
+            prefixes,
         }
     }
 }
@@ -53,7 +51,7 @@ impl From<&Configuration> for Namespace {
 
         // merge with default namespaces
         if let Some(ref x) = cnf.namespaces {
-            ns.namespaces.extend(x.clone());
+            ns.prefixes.extend(x.clone());
         }
 
         ns

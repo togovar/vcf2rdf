@@ -5,7 +5,6 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::Result;
-use crate::rdf::namespace::Namespaces;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Sequence {
@@ -17,7 +16,7 @@ pub struct Sequence {
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Configuration {
     pub base: Option<String>,
-    pub namespaces: Option<Namespaces>,
+    pub namespaces: Option<BTreeMap<String, String>>,
     pub info: Option<Vec<String>>,
     pub reference: BTreeMap<String, Option<Sequence>>,
 }

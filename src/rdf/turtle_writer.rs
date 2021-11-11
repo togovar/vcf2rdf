@@ -74,7 +74,7 @@ impl<'a, W: Write> TurtleWriter<'a, W> {
         let max_len = self
             .namespace
             .unwrap()
-            .namespaces
+            .prefixes
             .keys()
             .max_by_key(|x| x.len())
             .unwrap()
@@ -84,7 +84,7 @@ impl<'a, W: Write> TurtleWriter<'a, W> {
             buf += &format!("@base {:>width$}<{}> .\n", "", base, width = max_len + 4);
         }
 
-        for (k, v) in &self.namespace.unwrap().namespaces {
+        for (k, v) in &self.namespace.unwrap().prefixes {
             buf += &format!("@prefix {:>width$}: <{}> .\n", k, v, width = max_len);
         }
 
