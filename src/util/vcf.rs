@@ -11,6 +11,7 @@ use crate::vcf::info::InfoKeys;
 use crate::vcf::reader::{Info, InfoValue};
 
 pub mod compress;
+pub mod tabix;
 
 /// Returns the hts format information
 ///
@@ -84,10 +85,9 @@ pub fn get_format<P: AsRef<Path>>(path: P) -> Result<htslib::htsFormat> {
     Ok(format)
 }
 
-#[allow(dead_code)]
 struct Reader {
     inner: *mut htslib::htsFile,
-    header: Rc<bcf::header::HeaderView>,
+    _header: Rc<bcf::header::HeaderView>,
 }
 
 impl Drop for Reader {

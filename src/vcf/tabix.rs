@@ -8,7 +8,7 @@ use rust_htslib::tbx::Read;
 
 use crate::errors::{Error, Result};
 use crate::util::path;
-use crate::util::vcf::compress;
+use crate::util::vcf::tabix;
 
 #[derive(Debug)]
 pub struct Tabix {
@@ -56,7 +56,7 @@ impl Tabix {
     /// * `input` - Path to input VCF (need to compressed by `bgzip`).
     ///
     pub fn index<P: AsRef<Path>>(path: P) -> Result<Tabix> {
-        compress::tabix(path.as_ref())?;
+        tabix::create(path.as_ref())?;
 
         let tbi = path::change_extension(path.as_ref(), "gz.tbi")?;
 

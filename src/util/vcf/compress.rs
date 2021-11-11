@@ -1,5 +1,4 @@
 //! Module for working with bgzip and tabix
-use std::ffi;
 use std::ffi::CString;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -7,9 +6,8 @@ use std::path::{Path, PathBuf};
 
 use rust_htslib::htslib;
 
+use super::tabix;
 use crate::errors::{Error, Result};
-
-const WINDOW_SIZE: usize = 64 * 1024;
 
 /// Compress input file to bgzip
 ///
@@ -40,7 +38,7 @@ pub fn from_path<P: AsRef<Path>>(
         }
     };
 
-    let mut reader = BufReader::with_capacity(WINDOW_SIZE, File::open(&input)?);
+    let mut reader = BufReader::new(File::open(&input)?);
 
     from_reader(&mut reader, output, level, index)
 }
@@ -118,52 +116,8 @@ pub fn from_reader<R: BufRead, P: AsRef<Path>>(
     };
 
     if index {
-        tabix(&output)?;
+        tabix::create(&output)?;
     }
 
     Ok(())
-}
-
-/// Build `.tbi` index
-///
-/// This function just calls htslib bindings:
-///
-/// ```ignore
-/// extern "C" {
-///     pub fn tbx_index_build(
-///         fn_: *const ::std::os::raw::c_char,
-///         min_shift: ::std::os::raw::c_int,
-///         conf: *const tbx_conf_t,
-///     ) -> ::std::os::raw::c_int;
-/// }
-/// ```
-///
-/// # Arguments
-///
-/// * `input` - Path to input (bgzipped) VCF.
-///
-/// Example:
-/// ```no_run
-/// use vcf2rdf::util::vcf::compress;
-/// compress::tabix("path/to/your.vcf.gz");
-/// // => to be stored at path/to/your.vcf.gz.tbi
-/// ```
-pub fn tabix<P: AsRef<Path>>(input: P) -> Result<()> {
-    match input.as_ref().to_str() {
-        Some(path) => {
-            let p = ffi::CString::new(path)?;
-            let ret: i32 = unsafe { htslib::tbx_index_build(p.as_ptr(), 0, &htslib::tbx_conf_vcf) };
-
-            if ret == 0 {
-                Ok(())
-            } else if ret == -2 {
-                Err(Error::NotBgzipFileError(path.to_string()))?
-            } else {
-                Err(Error::IndexBuildFailedError(path.to_string()))?
-            }
-        }
-        None => Err(Error::FilePathError(
-            input.as_ref().to_string_lossy().to_string(),
-        ))?,
-    }
 }
