@@ -14,13 +14,56 @@ pub trait AsTurtle<W> {
         W: Write;
 }
 
-#[derive(Debug)]
+pub struct SubjectFormatter {
+    func: fn(&Record) -> Option<String>,
+}
+
+impl Default for SubjectFormatter {
+    fn default() -> Self {
+        SubjectFormatter {
+            func: |_record: &Record| None,
+        }
+    }
+}
+
+impl From<&crate::cli::converter::Subject> for SubjectFormatter {
+    fn from(v: &crate::cli::converter::Subject) -> Self {
+        match v {
+            Subject::ID => SubjectFormatter {
+                func: |record: &Record| {
+                    Some(unsafe { String::from_utf8_unchecked(record.inner.id()) })
+                },
+            },
+            Subject::Location => SubjectFormatter {
+                func: |record: &Record| {
+                    let alt = record.alteration;
+
+                    Some(format!(
+                        "{}-{}-{}-{}",
+                        record.sequence.name.as_ref().unwrap(),
+                        alt.position.to_string(),
+                        alt.reference,
+                        alt.alternate
+                    ))
+                },
+            },
+        }
+    }
+}
+
+impl SubjectFormatter {
+    pub fn format(&self, record: &Record) -> Option<String> {
+        (self.func)(record)
+    }
+}
+
 pub struct TurtleWriter<'a, W: Write> {
     wtr: BufWriter<W>,
     state: WriterState,
     namespace: Option<&'a Namespace>,
     info_key: Option<&'a Vec<String>>,
     pub subject_id: Option<Subject>,
+    subject_formatter: SubjectFormatter,
 }
 
 #[derive(Debug)]
@@ -50,6 +93,7 @@ impl<'a, W: Write> TurtleWriter<'a, W> {
             namespace: None,
             info_key: None,
             subject_id: None,
+            subject_formatter: Default::default(),
         }
     }
 
@@ -65,6 +109,11 @@ impl<'a, W: Write> TurtleWriter<'a, W> {
 
     pub fn subject(&mut self, subject_id: Option<Subject>) -> &TurtleWriter<'a, W> {
         self.subject_id = subject_id;
+        self
+    }
+
+    pub fn subject_formatter(&mut self, formatter: SubjectFormatter) -> &TurtleWriter<'a, W> {
+        self.subject_formatter = formatter;
         self
     }
 
@@ -106,5 +155,9 @@ impl<'a, W: Write> Writer for TurtleWriter<'a, W> {
         }
 
         Ok(())
+    }
+
+    fn format_subject(&self, record: &Record) -> Option<String> {
+        self.subject_formatter.format(record)
     }
 }

@@ -7,7 +7,7 @@ use strum::{EnumString, EnumVariantNames, VariantNames};
 use crate::config::{Config, Sequence};
 use crate::errors::{Error, Result};
 use crate::rdf::namespace::Namespace;
-use crate::rdf::turtle_writer::TurtleWriter;
+use crate::rdf::turtle_writer::{SubjectFormatter, TurtleWriter};
 use crate::rdf::writer::Writer;
 use crate::util::vcf;
 use crate::vcf::alteration::Alteration;
@@ -43,13 +43,16 @@ pub struct Options {
 }
 
 pub fn run(options: Options) -> Result<()> {
-    let config = Config::from_path(&options.config)?;
+    let config = Config::from_path(options.config)?;
 
     let mut writer = TurtleWriter::new(std::io::stdout());
 
     let ns = Namespace::from(&config);
     writer.namespace(&ns);
-    writer.subject(options.subject);
+
+    if let Some(v) = options.subject.as_ref() {
+        writer.subject_formatter(SubjectFormatter::from(v));
+    }
 
     let mut vcf = Reader::from_path(options.input)?;
 

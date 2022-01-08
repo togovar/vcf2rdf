@@ -2,9 +2,9 @@ use std::io::Write;
 
 use rust_htslib::bcf;
 
-use crate::cli::converter::Subject;
 use crate::errors::Result;
 use crate::rdf::turtle_writer::{AsTurtle, TurtleWriter};
+use crate::rdf::writer::Writer;
 use crate::vcf::alteration::AlterationPosition;
 use crate::vcf::reader::InfoValue;
 use crate::vcf::record::Record;
@@ -53,8 +53,14 @@ impl<W: Write> AsTurtle<W> for Record<'_> {
         let alt = self.alteration;
         let qual = self.inner.qual();
 
-        self.write_subject(&wtr, &mut buf);
-
+        match wtr.format_subject(&self) {
+            Some(v) => {
+                buf.push_str("<");
+                buf.push_str(v.as_str());
+                buf.push_str(">");
+            }
+            None => buf.push_str("[]"),
+        }
         buf.push_str(" a gvo:");
         buf.push_str(self.alteration.normalized_position.to_str());
 
@@ -97,33 +103,6 @@ impl<W: Write> AsTurtle<W> for Record<'_> {
 }
 
 impl Record<'_> {
-    fn write_subject<W: Write>(&self, wtr: &TurtleWriter<W>, buf: &mut Buffer) {
-        match &wtr.subject_id {
-            Some(Subject::ID) => {
-                let id = unsafe { String::from_utf8_unchecked(self.inner.id()) };
-                buf.push_iri(&id);
-            }
-            Some(Subject::Location) => {
-                let alt = self.alteration;
-
-                buf.push_str("<");
-                if let Some(ref name) = self.sequence.name {
-                    buf.push_str(name.as_str());
-                    buf.push_str("-");
-                }
-                buf.push_str(alt.position.to_string().as_str());
-                buf.push_str("-");
-                buf.push_str(alt.reference);
-                buf.push_str("-");
-                buf.push_str(alt.alternate);
-                buf.push_str(">");
-            }
-            _ => {
-                buf.push_str("[]");
-            }
-        };
-    }
-
     fn write_location(&self, buf: &mut Buffer) {
         buf.push_str(" ;\n  faldo:location [");
         match self.alteration.normalized_position {

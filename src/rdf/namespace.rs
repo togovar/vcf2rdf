@@ -41,16 +41,16 @@ impl Default for Namespace {
 
 impl From<&Config> for Namespace {
     /// Create from `cli::configuration::Configuration`
-    fn from(cnf: &Config) -> Self {
+    fn from(config: &Config) -> Self {
         let mut ns = Namespace::default();
 
-        ns.base = match cnf.base {
-            Some(ref x) => Some(x.clone()),
+        ns.base = match config.base.as_ref() {
+            Some(x) => Some(x.clone()),
             None => None,
         };
 
         // merge with default namespaces
-        if let Some(ref x) = cnf.namespaces {
+        if let Some(x) = config.namespaces.as_ref() {
             ns.prefixes.extend(x.clone());
         }
 
