@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
-use crate::cli::Subject;
+use crate::cli::converter::Subject;
 use crate::errors::Result;
 use crate::rdf::namespace::Namespace;
 use crate::rdf::writer::Writer;

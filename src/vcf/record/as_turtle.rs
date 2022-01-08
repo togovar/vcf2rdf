@@ -2,7 +2,7 @@ use std::io::Write;
 
 use rust_htslib::bcf;
 
-use crate::cli::Subject;
+use crate::cli::converter::Subject;
 use crate::errors::Result;
 use crate::rdf::turtle_writer::{AsTurtle, TurtleWriter};
 use crate::vcf::alteration::AlterationPosition;

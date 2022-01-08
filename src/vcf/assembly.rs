@@ -169,13 +169,13 @@ static GRCM39: Lazy<Assembly> = Lazy::new(|| Assembly {
     },
 });
 
-impl<'a> From<&crate::cli::Assembly> for Assembly<'a> {
-    fn from(assembly: &crate::cli::Assembly) -> Self {
+impl<'a> From<&crate::cli::generator::Assembly> for Assembly<'a> {
+    fn from(assembly: &crate::cli::generator::Assembly) -> Self {
         match assembly {
-            crate::cli::Assembly::GRCH37 => GRCH37_P13.clone(),
-            crate::cli::Assembly::GRCH38 => GRCH38_P13.clone(),
-            crate::cli::Assembly::GRCM38 => GRCM38.clone(),
-            crate::cli::Assembly::GRCM39 => GRCM39.clone(),
+            crate::cli::generator::Assembly::GRCH37 => GRCH37_P13.clone(),
+            crate::cli::generator::Assembly::GRCH38 => GRCH38_P13.clone(),
+            crate::cli::generator::Assembly::GRCM38 => GRCM38.clone(),
+            crate::cli::generator::Assembly::GRCM39 => GRCM39.clone(),
         }
     }
 }

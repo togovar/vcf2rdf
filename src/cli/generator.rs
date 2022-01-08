@@ -1,19 +1,49 @@
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
+use std::path::PathBuf;
 
-use crate::cli::configuration::{Configuration, Sequence};
-use crate::cli::Generate;
+use structopt::StructOpt;
+use strum::VariantNames;
+use strum::{EnumString, EnumVariantNames};
+
+use crate::config::{Config, Sequence};
 use crate::errors::Result;
-use crate::vcf::assembly::Assembly;
+use crate::vcf::assembly;
 use crate::vcf::reader::Reader;
 
-pub fn run(command: Generate) -> Result<()> {
+#[derive(EnumString, EnumVariantNames, Debug)]
+pub enum Assembly {
+    #[strum(serialize = "GRCh37")]
+    GRCH37,
+    #[strum(serialize = "GRCh38")]
+    GRCH38,
+    #[strum(serialize = "GRCm38")]
+    GRCM38,
+    #[strum(serialize = "GRCm39")]
+    GRCM39,
+}
+
+#[derive(StructOpt, Debug)]
+pub enum Options {
+    /// Generates config template.
+    Config {
+        /// Pre-defined assembly.
+        #[structopt(short, long, possible_values = Assembly::VARIANTS)]
+        assembly: Option<Assembly>,
+
+        /// Path to file to process.
+        #[structopt(name = "FILE", parse(from_os_str))]
+        input: PathBuf,
+    },
+}
+
+pub fn run(command: Options) -> Result<()> {
     match command {
-        Generate::Config { assembly, input } => {
+        Options::Config { assembly, input } => {
             let vcf = Reader::from_path(input)?;
 
             let assembly = match assembly {
-                Some(ref a) => Assembly::try_from(a).ok(),
+                Some(ref a) => assembly::Assembly::try_from(a).ok(),
                 None => None,
             };
 
@@ -32,7 +62,7 @@ pub fn run(command: Generate) -> Result<()> {
                 reference.insert(c.name.to_owned(), seq.or(Some(Sequence::default())));
             }
 
-            let config = Configuration {
+            let config = Config {
                 base: None,
                 namespaces: None,
                 info: Some(vcf.info_keys()),

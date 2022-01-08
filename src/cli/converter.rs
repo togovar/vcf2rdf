@@ -1,7 +1,10 @@
-use log::*;
+use std::path::PathBuf;
 
-use crate::cli::configuration::{Configuration, Sequence};
-use crate::cli::Convert;
+use log::*;
+use structopt::StructOpt;
+use strum::{EnumString, EnumVariantNames, VariantNames};
+
+use crate::config::{Config, Sequence};
 use crate::errors::{Error, Result};
 use crate::rdf::namespace::Namespace;
 use crate::rdf::turtle_writer::TurtleWriter;
@@ -12,8 +15,35 @@ use crate::vcf::info::InfoKeys;
 use crate::vcf::reader::{Info, Reader};
 use crate::vcf::record::Record;
 
-pub fn run(options: Convert) -> Result<()> {
-    let config = Configuration::from_path(&options.config)?;
+#[derive(EnumString, EnumVariantNames, Debug)]
+#[strum(serialize_all = "lowercase")]
+pub enum Subject {
+    ID,
+    Location,
+}
+
+#[derive(StructOpt, Debug)]
+pub struct Options {
+    /// Path to configuration yaml.
+    #[structopt(short, long, parse(from_os_str))]
+    pub config: PathBuf,
+
+    /// Processes only one record and exit.
+    #[structopt(long)]
+    pub rehearsal: bool,
+
+    /// Strategy to generate a subject (use blank node if not specified).
+    /// If use `id`, ensure that all values at ID column are present and unique.
+    #[structopt(short, long, possible_values = Subject::VARIANTS)]
+    pub subject: Option<Subject>,
+
+    /// Path to file to process.
+    #[structopt(parse(from_os_str))]
+    pub input: PathBuf,
+}
+
+pub fn run(options: Options) -> Result<()> {
+    let config = Config::from_path(&options.config)?;
 
     let mut writer = TurtleWriter::new(std::io::stdout());
 
