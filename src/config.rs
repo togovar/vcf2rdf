@@ -14,16 +14,16 @@ pub struct Sequence {
 
 /// A structure for user configuration.
 #[derive(Debug, Default, Serialize, Deserialize)]
-pub struct Configuration {
+pub struct Config {
     pub base: Option<String>,
     pub namespaces: Option<BTreeMap<String, String>>,
     pub info: Option<Vec<String>>,
     pub reference: BTreeMap<String, Option<Sequence>>,
 }
 
-impl Configuration {
+impl Config {
     /// Read a yaml configuration from a given path.
-    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
+    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Config> {
         Ok(serde_yaml::from_reader(File::open(path)?)?)
     }
 }

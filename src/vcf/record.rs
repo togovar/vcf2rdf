@@ -1,6 +1,6 @@
 use rust_htslib::bcf::Record as VCFRecord;
 
-use crate::cli::configuration::Sequence;
+use crate::config::Sequence;
 use crate::vcf::alteration::Alteration;
 use crate::vcf::reader::Info;
 

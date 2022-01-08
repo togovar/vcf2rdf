@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::cli::configuration::Configuration;
+use crate::config::Config;
 
 const DCT: &str = "http://purl.org/dc/terms/";
 const FALDO: &str = "http://biohackathon.org/resource/faldo#";
@@ -39,9 +39,9 @@ impl Default for Namespace {
     }
 }
 
-impl From<&Configuration> for Namespace {
+impl From<&Config> for Namespace {
     /// Create from `cli::configuration::Configuration`
-    fn from(cnf: &Configuration) -> Self {
+    fn from(cnf: &Config) -> Self {
         let mut ns = Namespace::default();
 
         ns.base = match cnf.base {

@@ -25,6 +25,17 @@ impl<'a> Assembly<'a> {
     }
 }
 
+impl<'a> From<&crate::cli::generator::Assembly> for Assembly<'a> {
+    fn from(assembly: &crate::cli::generator::Assembly) -> Self {
+        match assembly {
+            crate::cli::generator::Assembly::GRCH37 => GRCH37_P13.clone(),
+            crate::cli::generator::Assembly::GRCH38 => GRCH38_P13.clone(),
+            crate::cli::generator::Assembly::GRCM38 => GRCM38.clone(),
+            crate::cli::generator::Assembly::GRCM39 => GRCM39.clone(),
+        }
+    }
+}
+
 macro_rules! sequences {
     (
         $(
@@ -168,14 +179,3 @@ static GRCM39: Lazy<Assembly> = Lazy::new(|| Assembly {
         ("Y", "CM001014.3", "NC_000087.8", "chrY", "https://identifiers.org/refseq/NC_000087.8");
     },
 });
-
-impl<'a> From<&crate::cli::generator::Assembly> for Assembly<'a> {
-    fn from(assembly: &crate::cli::generator::Assembly) -> Self {
-        match assembly {
-            crate::cli::generator::Assembly::GRCH37 => GRCH37_P13.clone(),
-            crate::cli::generator::Assembly::GRCH38 => GRCH38_P13.clone(),
-            crate::cli::generator::Assembly::GRCM38 => GRCM38.clone(),
-            crate::cli::generator::Assembly::GRCM39 => GRCM39.clone(),
-        }
-    }
-}

@@ -42,8 +42,8 @@ pub fn run(command: Options) -> Result<()> {
         Options::Config { assembly, input } => {
             let vcf = Reader::from_path(input)?;
 
-            let assembly = match assembly {
-                Some(ref a) => assembly::Assembly::try_from(a).ok(),
+            let assembly = match assembly.as_ref() {
+                Some(v) => assembly::Assembly::try_from(v).ok(),
                 None => None,
             };
 

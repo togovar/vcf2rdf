@@ -1,6 +1,6 @@
 use std::slice::Iter;
 
-use crate::cli::configuration::Configuration;
+use crate::config::Config;
 
 #[derive(Debug)]
 pub struct InfoKeys {
@@ -13,8 +13,8 @@ impl InfoKeys {
     }
 }
 
-impl From<&Configuration> for InfoKeys {
-    fn from(c: &Configuration) -> Self {
+impl From<&Config> for InfoKeys {
+    fn from(c: &Config) -> Self {
         InfoKeys {
             inner: match &c.info {
                 Some(x) => x.clone(),
