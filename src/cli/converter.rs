@@ -1,10 +1,10 @@
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use log::*;
 use structopt::StructOpt;
 use strum::{EnumString, EnumVariantNames, VariantNames};
 
-use crate::config::{Config, Sequence};
+use crate::config::Config;
 use crate::errors::{Error, Result};
 use crate::rdf::namespace::Namespace;
 use crate::rdf::turtle_writer::{SubjectFormatter, TurtleWriter};
@@ -56,34 +56,24 @@ pub fn run(options: Options) -> Result<()> {
 
     let mut vcf = Reader::from_path(options.input)?;
 
-    let sequences: Vec<Option<Sequence>> = {
+    let sequences = {
         let contig = vcf.contig();
-        let max: usize = contig
-            .iter()
-            .max_by(|x, y| x.rid.cmp(&y.rid))
-            .map_or(0, |x| x.rid as usize);
 
-        let mut vec = vec![None; max + 1];
-
-        if config
-            .reference
-            .values()
-            .any(|x| x.as_ref().map_or(true, |y| y.reference.is_none()))
-        {
-            warn!(
-                "Some reference of sequences are empty. Records on these chromosomes are ignored."
-            )
-        }
+        let mut map = BTreeMap::new();
 
         for c in contig {
-            vec[c.rid as usize] = config
-                .reference
-                .get(&c.name)
-                .ok_or(Error::ConfigurationNotFoundError(c.name.to_owned()))?
-                .to_owned();
+            map.insert(
+                c.rid,
+                config
+                    .reference
+                    .get(&c.name)
+                    .ok_or(Error::ConfigurationNotFoundError(c.name.to_owned()))?
+                    .as_ref()
+                    .ok_or(Error::InvalidConfigurationError(c.name.to_owned()))?,
+            );
         }
 
-        vec
+        map
     };
 
     let filters = vcf.filters();
@@ -95,7 +85,7 @@ pub fn run(options: Options) -> Result<()> {
 
         let rid = record.rid().ok_or(Error::ReferenceIndexError)?;
 
-        let seq = sequences.get(rid as usize).unwrap().as_ref().unwrap();
+        let seq = *sequences.get(&rid).unwrap();
 
         let filter: Vec<&str> = record
             .filters()

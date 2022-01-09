@@ -49,4 +49,7 @@ pub enum Error {
 
     #[error("Missing configuration: {0}")]
     ConfigurationNotFoundError(String),
+
+    #[error("Invalid configuration: {0}")]
+    InvalidConfigurationError(String),
 }

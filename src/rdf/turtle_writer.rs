@@ -30,8 +30,12 @@ impl From<&crate::cli::converter::Subject> for SubjectFormatter {
     fn from(v: &crate::cli::converter::Subject) -> Self {
         match v {
             Subject::ID => SubjectFormatter {
-                func: |record: &Record| {
-                    Some(unsafe { String::from_utf8_unchecked(record.inner.id()) })
+                func: |record: &Record| unsafe {
+                    match String::from_utf8_unchecked(record.inner.id()).as_str() {
+                        "." => None,
+                        v if v.is_empty() => None,
+                        v => Some(v.to_owned()),
+                    }
                 },
             },
             Subject::Location => SubjectFormatter {
@@ -41,7 +45,7 @@ impl From<&crate::cli::converter::Subject> for SubjectFormatter {
                     Some(format!(
                         "{}-{}-{}-{}",
                         record.sequence.name.as_ref().unwrap(),
-                        alt.position.to_string(),
+                        alt.position.to_string(), // TODO use normalized position
                         alt.reference,
                         alt.alternate
                     ))
