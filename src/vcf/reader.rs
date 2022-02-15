@@ -1,10 +1,10 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::ffi::{CString, OsString};
-use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io;
 use std::io::{BufRead, BufWriter, Write};
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use log::*;
 use rust_htslib::bcf;
@@ -13,50 +13,46 @@ use rust_htslib::errors::Error as htslib_error;
 use rust_htslib::htslib;
 use tempfile::TempDir;
 
+use crate::config::Sequence;
 use crate::errors::{Error, Result};
-use crate::vcf::info::InfoKeys;
-
-#[derive(Debug)]
-pub struct Reader {
-    reader: bcf::Reader,
-    tbx: *mut htslib::tbx_t,
-    temp_dir: Option<TempDir>,
-}
-
-#[derive(Debug, Eq, PartialEq)]
-pub struct Contig {
-    pub rid: u32,
-    pub name: String,
-}
-
-#[derive(Debug, PartialEq)]
-pub enum InfoValue {
-    Flag(bool),
-    Integer(i32),
-    Float(f32),
-    String(String),
-}
-
-impl Display for InfoValue {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
-    }
-}
-
-#[derive(Debug)]
-pub struct Info<'a> {
-    pub key: &'a str,
-    pub value: Vec<InfoValue>,
-    pub typ: bcf::header::TagType,
-    pub length: bcf::header::TagLength,
-}
+use crate::vcf::record;
 
 const FILENAME_STDIN: &'static str = "stdin.vcf";
 
-impl Reader {
-    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
+#[derive(Debug)]
+pub struct ReaderBuilder {
+    info_keys: Option<Vec<String>>,
+    references: BTreeMap<String, Option<Sequence>>,
+    normalize: bool,
+}
+
+impl ReaderBuilder {
+    pub fn new() -> Self {
+        ReaderBuilder {
+            info_keys: None,
+            references: Default::default(),
+            normalize: true,
+        }
+    }
+
+    pub fn info_keys(mut self, keys: Vec<String>) -> Self {
+        self.info_keys = Some(keys);
+        self
+    }
+
+    pub fn reference(mut self, reference: BTreeMap<String, Option<Sequence>>) -> Self {
+        self.references = reference;
+        self
+    }
+
+    pub fn normalize(mut self, flag: bool) -> Self {
+        self.normalize = flag;
+        self
+    }
+
+    pub fn path<P: AsRef<Path>>(&self, path: P) -> Result<Reader> {
         match path.as_ref().to_str() {
-            Some(p) if path.as_ref().exists() => Self::new(p, None),
+            Some(p) if path.as_ref().exists() => self.build(p, None),
             Some(p) if !path.as_ref().exists() => Err(Error::FileNotFoundError(p.to_string()))?,
             _ => Err(Error::FilePathError(
                 path.as_ref().to_string_lossy().to_string(),
@@ -64,14 +60,14 @@ impl Reader {
         }
     }
 
-    pub fn from_stdin() -> Result<Self> {
+    pub fn stdin(&self) -> Result<Reader> {
         let stdin = io::stdin();
-        let handle = stdin.lock();
+        let stdin = stdin.lock();
 
-        Self::from_reader(handle)
+        self.reader(stdin)
     }
 
-    pub fn from_reader<R: BufRead>(mut reader: R) -> Result<Self> {
+    pub fn reader<R: BufRead>(&self, mut reader: R) -> Result<Reader> {
         let tmp_dir = TempDir::new()?;
         debug!("Create temporary directory: {:?}", tmp_dir);
 
@@ -89,14 +85,14 @@ impl Reader {
         debug!("Contents from stdin stored to {:?}", tmp_file);
 
         match tmp_file.to_str() {
-            Some(p) if tmp_file.exists() => Self::new(p, Some(tmp_dir)),
+            Some(p) if tmp_file.exists() => self.build(p, Some(tmp_dir)),
             Some(p) => Err(Error::FileNotFoundError(p.to_string())),
             None => Err(Error::FilePathError(tmp_file.to_string_lossy().to_string())),
         }
     }
 
-    pub fn new(path: &str, temp_dir: Option<TempDir>) -> Result<Self> {
-        if let Some(p) = Reader::tbi_path(path) {
+    fn build(&self, path: &str, temp_dir: Option<TempDir>) -> Result<Reader> {
+        if let Some(p) = Self::tbi_path(path) {
             if !p.exists() {
                 Err(Error::IndexNotFoundError(p.to_string_lossy().to_string()))?;
             }
@@ -109,8 +105,19 @@ impl Reader {
             Err(htslib_error::Fetch)?;
         }
 
+        let info = self.info(path);
+        let info_keys = match self.info_keys.as_ref() {
+            Some(vec) => vec.clone(),
+            None => info.iter().map(|(k, _)| k.to_owned()).collect(),
+        };
+
         Ok(Reader {
             reader: rust_htslib::bcf::Reader::from_path(path)?,
+            references: self.references(path),
+            filters: self.filters(path),
+            info,
+            info_keys,
+            normalize: self.normalize,
             tbx,
             temp_dir,
         })
@@ -129,77 +136,114 @@ impl Reader {
         }
     }
 
-    pub fn records(&mut self) -> bcf::Records<'_, bcf::Reader> {
-        self.reader.records()
+    fn references(&self, path: &str) -> BTreeMap<u32, Sequence> {
+        let mut map = BTreeMap::new();
+
+        if let Ok(reader) = rust_htslib::bcf::Reader::from_path(path) {
+            reader.header().header_records().iter().for_each(|x| {
+                if let bcf::HeaderRecord::Contig { key: _key, values } = x {
+                    if let Some(Ok(idx)) = values.get("IDX").map(|v| u32::from_str(v)) {
+                        if let Some(id) = values.get("ID") {
+                            if let Some(Some(seq)) = self.references.get(id) {
+                                map.insert(idx, seq.clone());
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        map
+    }
+
+    fn filters(&self, path: &str) -> BTreeMap<u32, String> {
+        let mut map = BTreeMap::new();
+
+        if let Ok(reader) = rust_htslib::bcf::Reader::from_path(path) {
+            reader.header().header_records().iter().for_each(|x| {
+                if let bcf::HeaderRecord::Filter { values, .. } = x {
+                    if let Some(v) = values.get("ID") {
+                        if let Ok(id) = reader.header().name_to_id(v.as_bytes()) {
+                            map.insert(id.0, v.to_owned());
+                        }
+                    }
+                }
+            });
+        }
+
+        map
+    }
+
+    fn info(&self, path: &str) -> BTreeMap<String, (bcf::header::TagType, bcf::header::TagLength)> {
+        let mut map = BTreeMap::new();
+
+        if let Ok(reader) = rust_htslib::bcf::Reader::from_path(path) {
+            reader.header().header_records().iter().for_each(|x| {
+                if let bcf::HeaderRecord::Info { values, .. } = x {
+                    if let Some(v) = values.get("ID") {
+                        if let Ok((typ, len)) = reader.header().info_type(v.as_bytes()) {
+                            map.insert(v.to_owned(), (typ, len));
+                        }
+                    }
+                }
+            });
+        }
+
+        map
+    }
+}
+
+#[derive(Debug)]
+pub struct Reader {
+    reader: bcf::Reader,
+    // mapping contigs to references
+    references: BTreeMap<u32, Sequence>,
+    // header cache
+    filters: BTreeMap<u32, String>,
+    // header cache
+    info: BTreeMap<String, (bcf::header::TagType, bcf::header::TagLength)>,
+    // list of keys to read
+    info_keys: Vec<String>,
+    normalize: bool,
+    tbx: *mut htslib::tbx_t,
+    temp_dir: Option<TempDir>,
+}
+
+impl Reader {
+    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
+        ReaderBuilder::new().path(path)
     }
 
     pub fn header(&self) -> &bcf::header::HeaderView {
         self.reader.header()
     }
 
-    pub fn filters(&self) -> HashMap<u32, String> {
-        let mut m = HashMap::new();
+    pub fn contigs(&self) -> BTreeMap<u32, String> {
+        let mut map = BTreeMap::new();
 
-        self.header().header_records().iter().for_each(|hr| {
-            if let bcf::HeaderRecord::Filter { values, .. } = hr {
+        self.reader.header().header_records().iter().for_each(|x| {
+            if let bcf::HeaderRecord::Contig { key: _key, values } = x {
                 if let Some(v) = values.get("ID") {
-                    if let Ok(id) = self.header().name_to_id(v.as_bytes()) {
-                        m.insert(id.0, v.to_owned());
+                    if let Ok(i) = self.reader.header().name2rid(v.as_bytes()) {
+                        map.insert(i, v.to_owned());
                     }
                 }
             }
         });
 
-        m
+        map
     }
 
-    pub fn info_keys(&self) -> Vec<String> {
-        self.header()
-            .header_records()
-            .iter()
-            .filter_map(|hr| match hr {
-                bcf::HeaderRecord::Info { values, .. } => {
-                    values.get("ID").and_then(|x| Some(x.to_owned()))
-                }
-                _ => None,
-            })
-            .collect()
+    pub fn references(&self) -> &BTreeMap<u32, Sequence> {
+        &self.references
     }
 
-    pub fn info_types(
-        &self,
-        keys: &InfoKeys,
-    ) -> HashMap<String, (bcf::header::TagType, bcf::header::TagLength)> {
-        let mut m = HashMap::new();
-
-        keys.iter().for_each(|x| {
-            if let Ok((typ, len)) = self.header().info_type(x.as_bytes()) {
-                m.insert(x.to_owned(), (typ, len));
-            }
-        });
-
-        m
+    pub fn info(&self) -> &BTreeMap<String, (bcf::header::TagType, bcf::header::TagLength)> {
+        &self.info
     }
 
-    pub fn contig(&self) -> Vec<Contig> {
-        self.header()
-            .header_records()
-            .into_iter()
-            .filter_map(|x| match x {
-                bcf::HeaderRecord::Contig { key: _key, values } => values.get("ID").and_then(|x| {
-                    self.header()
-                        .name2rid(x.as_bytes())
-                        .and_then(|i| {
-                            Ok(Contig {
-                                rid: i,
-                                name: x.to_owned(),
-                            })
-                        })
-                        .ok()
-                }),
-                _ => None,
-            })
-            .collect()
+    pub fn info_keys(&self) -> &Vec<String> {
+        &self.info_keys
     }
 
     pub fn count(&self) -> u64 {
@@ -223,12 +267,52 @@ impl Reader {
 
         sum
     }
+
+    pub fn records(&mut self) -> Records<'_> {
+        Records {
+            reader: &mut self.reader,
+            references: &self.references,
+            filters: &self.filters,
+            info: &self.info,
+            info_keys: &self.info_keys,
+            normalize: self.normalize,
+        }
+    }
 }
 
 impl Drop for Reader {
     fn drop(&mut self) {
         unsafe {
             htslib::tbx_destroy(self.tbx);
+        }
+    }
+}
+
+pub struct Records<'a> {
+    reader: &'a mut bcf::Reader,
+    references: &'a BTreeMap<u32, Sequence>,
+    filters: &'a BTreeMap<u32, String>,
+    info: &'a BTreeMap<String, (bcf::header::TagType, bcf::header::TagLength)>,
+    info_keys: &'a Vec<String>,
+    normalize: bool,
+}
+
+impl<'a> Iterator for Records<'a> {
+    type Item = Result<record::Record<'a>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut record = self.reader.empty_record();
+        match self.reader.read(&mut record) {
+            Some(Err(e)) => Some(Err(e.into())),
+            Some(Ok(_)) => Some(Ok(record::Record::new(
+                record,
+                self.references,
+                self.filters,
+                self.info,
+                self.info_keys,
+                self.normalize,
+            ))),
+            None => None,
         }
     }
 }
@@ -271,16 +355,15 @@ mod tests {
         let vcf = Reader::from_path("test/dbsnp_example.vcf.gz").expect("Error opening file.");
         let keys = vcf.info_keys();
 
-        assert_eq!(keys[0], "RS".to_string());
-        assert_eq!(keys[30], "CLNACC".to_string());
+        assert!(keys.contains(&"RS".to_string()));
+        assert!(keys.contains(&"CLNACC".to_string()));
         assert_eq!(keys.len(), 31);
     }
 
     #[test]
     fn test_info_types() {
         let vcf = Reader::from_path("test/dbsnp_example.vcf.gz").expect("Error opening file.");
-        let keys = vec!["RS".to_string(), "NOT_FOUND".to_string()];
-        let info_types = vcf.info_types(&InfoKeys::from(&keys));
+        let info_types = vcf.info();
 
         assert_eq!(
             info_types.get("RS").expect("Error obtaining info type"),
@@ -295,10 +378,10 @@ mod tests {
     #[test]
     fn test_contig() {
         let vcf = Reader::from_path("test/dbsnp_example.vcf.gz").expect("Error opening file.");
-        let contig = vcf.contig();
+        let contigs = vcf.contigs();
 
-        assert_eq!(contig[0].name, "NC_000001.10");
-        assert_eq!(contig[23].name, "NC_000024.9");
+        assert_eq!(contigs.get(&0).unwrap(), "NC_000001.10");
+        assert_eq!(contigs.get(&23).unwrap(), "NC_000024.9");
     }
 
     #[test]
@@ -354,25 +437,6 @@ mod tests {
                 .expect("Missing tag")[0],
             1558169388
         );
-    }
-
-    fn read_dbsnp_example_2_as_vec() -> Vec<rust_htslib::bcf::Record> {
-        read_vcf_as_vec("test/dbsnp_example_wo_info_metadata.vcf.gz")
-    }
-
-    #[test]
-    fn test_read_undefined_info() {
-        let records = read_dbsnp_example_2_as_vec();
-
-        let vec = records[0]
-            .info(b"RS")
-            .string()
-            .expect("Error reading string.")
-            .expect("Missing tag")[0];
-
-        assert_eq!("1570391677", unsafe {
-            String::from_utf8_unchecked(vec.to_vec())
-        });
     }
 
     #[test]

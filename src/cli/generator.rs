@@ -48,24 +48,24 @@ pub fn run(command: Options) -> Result<()> {
             };
 
             let mut reference = BTreeMap::new();
-            for c in vcf.contig().iter() {
+            for (_, name) in vcf.contigs().iter() {
                 let seq = assembly
                     .as_ref()
                     .map(|x| {
-                        x.find_sequence(&c.name).map(|x| Sequence {
+                        x.find_sequence(name).map(|x| Sequence {
                             name: Some(String::from(x.name)),
                             reference: Some(String::from(x.reference)),
                         })
                     })
                     .unwrap_or(None);
 
-                reference.insert(c.name.to_owned(), seq.or(Some(Sequence::default())));
+                reference.insert(name.to_owned(), seq.or(Some(Sequence::default())));
             }
 
             let config = Config {
                 base: None,
                 namespaces: None,
-                info: Some(vcf.info_keys()),
+                info: Some(vcf.info_keys().clone()),
                 reference,
             };
 

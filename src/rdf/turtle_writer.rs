@@ -6,7 +6,7 @@ use crate::cli::converter::Subject;
 use crate::errors::Result;
 use crate::rdf::namespace::Namespace;
 use crate::rdf::writer::Writer;
-use crate::vcf::record::Record;
+use crate::vcf::record::{Entry, Record};
 
 pub trait AsTurtle<W> {
     fn as_ttl_string(&self, wtr: &TurtleWriter<W>) -> Result<Option<String>>
@@ -15,13 +15,13 @@ pub trait AsTurtle<W> {
 }
 
 pub struct SubjectFormatter {
-    func: fn(&Record) -> Option<String>,
+    func: fn(&Entry) -> Option<String>,
 }
 
 impl Default for SubjectFormatter {
     fn default() -> Self {
         SubjectFormatter {
-            func: |_record: &Record| None,
+            func: |_: &Entry| None,
         }
     }
 }
@@ -30,8 +30,8 @@ impl From<&crate::cli::converter::Subject> for SubjectFormatter {
     fn from(v: &crate::cli::converter::Subject) -> Self {
         match v {
             Subject::ID => SubjectFormatter {
-                func: |record: &Record| unsafe {
-                    match String::from_utf8_unchecked(record.inner.id()).as_str() {
+                func: |entry: &Entry| unsafe {
+                    match String::from_utf8_unchecked(entry.record().inner().id()).as_str() {
                         "." => None,
                         v if v.is_empty() => None,
                         v => Some(v.to_owned()),
@@ -39,16 +39,83 @@ impl From<&crate::cli::converter::Subject> for SubjectFormatter {
                 },
             },
             Subject::Location => SubjectFormatter {
-                func: |record: &Record| {
-                    let alt = record.alteration;
+                func: |entry: &Entry| {
+                    if let Some(seq) = entry.record().sequence() {
+                        if let Some(name) = seq.name.as_ref() {
+                            Some(format!(
+                                "{}-{}-{}-{}",
+                                name,
+                                entry.position(),
+                                entry.reference_bases().unwrap_or(""),
+                                entry.alternate_bases().unwrap_or("")
+                            ))
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                },
+            },
+            Subject::Reference => SubjectFormatter {
+                func: |entry: &Entry| {
+                    if let Some(seq) = entry.record().sequence() {
+                        if let Some(uri) = seq.reference.as_ref() {
+                            Some(format!(
+                                "{}#{}-{}-{}",
+                                uri,
+                                entry.position(),
+                                entry.reference_bases().unwrap_or(""),
+                                entry.alternate_bases().unwrap_or("")
+                            ))
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                },
+            },
+            Subject::NormalizedLocation => SubjectFormatter {
+                func: |entry: &Entry| {
+                    let (position, reference, alternate, _) = entry.normalize();
 
-                    Some(format!(
-                        "{}-{}-{}-{}",
-                        record.sequence.name.as_ref().unwrap(),
-                        alt.position.to_string(), // TODO use normalized position
-                        alt.reference,
-                        alt.alternate
-                    ))
+                    if let Some(seq) = entry.record().sequence() {
+                        if let Some(name) = seq.name.as_ref() {
+                            Some(format!(
+                                "{}-{}-{}-{}",
+                                name,
+                                position,
+                                reference.unwrap_or(""),
+                                alternate.unwrap_or("")
+                            ))
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                },
+            },
+            Subject::NormalizedReference => SubjectFormatter {
+                func: |entry: &Entry| {
+                    let (position, reference, alternate, _) = entry.normalize();
+
+                    if let Some(seq) = entry.record().sequence() {
+                        if let Some(uri) = seq.reference.as_ref() {
+                            Some(format!(
+                                "{}#{}-{}-{}",
+                                uri,
+                                position,
+                                reference.unwrap_or(""),
+                                alternate.unwrap_or("")
+                            ))
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
                 },
             },
         }
@@ -56,8 +123,8 @@ impl From<&crate::cli::converter::Subject> for SubjectFormatter {
 }
 
 impl SubjectFormatter {
-    pub fn format(&self, record: &Record) -> Option<String> {
-        (self.func)(record)
+    pub fn format(&self, entry: &Entry) -> Option<String> {
+        (self.func)(entry)
     }
 }
 
@@ -68,6 +135,7 @@ pub struct TurtleWriter<'a, W: Write> {
     info_key: Option<&'a Vec<String>>,
     pub subject_id: Option<Subject>,
     subject_formatter: SubjectFormatter,
+    // normalize: bool,
 }
 
 #[derive(Debug)]
@@ -120,6 +188,11 @@ impl<'a, W: Write> TurtleWriter<'a, W> {
         self.subject_formatter = formatter;
         self
     }
+    //
+    // pub fn normalize(&mut self, flag: bool) -> &TurtleWriter<'a, W> {
+    //     self.normalize = flag;
+    //     self
+    // }
 
     fn write_headers(&mut self) -> Result<()> {
         let mut buf = String::with_capacity(4096);
@@ -149,19 +222,27 @@ impl<'a, W: Write> TurtleWriter<'a, W> {
 
 impl<'a, W: Write> Writer for TurtleWriter<'a, W> {
     fn write_record<'b>(&mut self, record: &Record<'b>) -> Result<()> {
+        for e in record.each_alternate_alleles() {
+            self.write_entry(&e)?;
+        }
+
+        Ok(())
+    }
+
+    fn write_entry(&mut self, entry: &Entry) -> Result<()> {
         if let HeaderState::DidNotWrite = self.state.header {
             self.write_headers()?;
             self.state.header = HeaderState::DidWrite;
         }
 
-        if let Some(r) = record.as_ttl_string(&self)? {
+        if let Some(r) = entry.as_ttl_string(&self)? {
             self.wtr.write_all(r.as_bytes())?;
         }
 
         Ok(())
     }
 
-    fn format_subject(&self, record: &Record) -> Option<String> {
-        self.subject_formatter.format(record)
+    fn format_subject(&self, entry: &Entry) -> Option<String> {
+        self.subject_formatter.format(entry)
     }
 }

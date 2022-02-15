@@ -5,9 +5,7 @@ use rust_htslib::bcf;
 use crate::errors::Result;
 use crate::rdf::turtle_writer::{AsTurtle, TurtleWriter};
 use crate::rdf::writer::Writer;
-use crate::vcf::alteration::AlterationPosition;
-use crate::vcf::reader::InfoValue;
-use crate::vcf::record::Record;
+use crate::vcf::record::{Entry, InfoValue};
 
 const BUFFER_DEFAULT: usize = 40 * 1024;
 
@@ -41,17 +39,12 @@ impl Buffer {
     }
 }
 
-impl<W: Write> AsTurtle<W> for Record<'_> {
-    fn as_ttl_string(&self, wtr: &TurtleWriter<W>) -> Result<Option<String>> {
-        if self.sequence.reference.is_none() {
-            return Ok(None);
-        }
-
+impl<W: Write> AsTurtle<W> for Entry<'_> {
+    fn as_ttl_string(&self, wtr: &TurtleWriter<W>) -> Result<Option<String>>
+    where
+        W: Write,
+    {
         let mut buf = Buffer::default();
-
-        let id = unsafe { String::from_utf8_unchecked(self.inner.id()) };
-        let alt = self.alteration;
-        let qual = self.inner.qual();
 
         match wtr.format_subject(&self) {
             Some(v) => {
@@ -61,29 +54,45 @@ impl<W: Write> AsTurtle<W> for Record<'_> {
             }
             None => buf.push_str("[]"),
         }
-        buf.push_str(" a gvo:");
-        buf.push_str(self.alteration.normalized_position.to_str());
 
-        if id != "." {
+        let (pos, reference, alternate, vc) = self.normalize();
+        let (pos, reference, alternate) = if self.record.normalize {
+            (pos, reference, alternate)
+        } else {
+            (
+                self.position(),
+                self.reference_bases(),
+                self.alternate_bases(),
+            )
+        };
+
+        if let Some(v) = vc.as_ref() {
+            buf.push_str(" a gvo:");
+            buf.push_str(v.to_str());
+        };
+
+        let id = unsafe { String::from_utf8_unchecked(self.record.inner.id()) };
+        if !id.is_empty() || id != "." {
             buf.push_str(" ;\n  dct:identifier ");
             buf.push_quoted(&id, '"');
         }
 
-        self.write_location(&mut buf);
+        self.write_location(&mut buf, pos, reference, alternate);
 
         buf.push_str(" ;\n  gvo:ref ");
-        buf.push_quoted(alt.normalized_reference, '"');
+        buf.push_quoted(reference.unwrap_or(""), '"');
 
         buf.push_str(" ;\n  gvo:alt ");
-        buf.push_quoted(alt.normalized_alternate, '"');
+        buf.push_quoted(alternate.unwrap_or(""), '"');
 
-        if qual.is_finite() {
+        let quality = self.record.quality();
+        if quality.is_finite() {
             buf.push_str(" ;\n  gvo:qual ");
-            buf.push_str(qual.to_string().as_str());
+            buf.push_str(quality.to_string().as_str());
         }
 
-        let filters = self.filter;
-        if filters.len() > 0 {
+        let filters = self.record.filters();
+        if !filters.is_empty() {
             buf.push_str(" ;\n  gvo:filter ");
 
             for (i, filter) in filters.iter().enumerate() {
@@ -102,74 +111,95 @@ impl<W: Write> AsTurtle<W> for Record<'_> {
     }
 }
 
-impl Record<'_> {
-    fn write_location(&self, buf: &mut Buffer) {
+impl Entry<'_> {
+    fn write_location(
+        &self,
+        buf: &mut Buffer,
+        position: i64,
+        reference: Option<&str>,
+        alternate: Option<&str>,
+    ) {
+        let seq = self.record.sequence().map(|x| x.reference.as_ref());
+
         buf.push_str(" ;\n  faldo:location [");
-        match self.alteration.normalized_position {
-            AlterationPosition::SNV(p) => {
+
+        match (
+            reference.map_or(0, |v| v.len()),
+            alternate.map_or(0, |v| v.len()),
+        ) {
+            (1, 1) => {
+                // SNV
                 buf.push_str("\n    a faldo:ExactPosition ;");
                 buf.push_str("\n    faldo:position ");
-                buf.push_str(p.to_string().as_str());
-                if let Some(ref reference) = self.sequence.reference {
+                buf.push_str(position.to_string().as_str());
+                if let Some(Some(seq)) = seq {
                     buf.push_str(" ;\n    faldo:reference ");
-                    buf.push_iri(reference.as_str());
+                    buf.push_iri(seq);
                 }
             }
-            AlterationPosition::Deletion(begin, end) | AlterationPosition::Indel(begin, end) => {
+            (0, _) => {
+                // Insertion
+                buf.push_str("\n    a faldo:InBetweenPosition ;");
+                buf.push_str("\n    faldo:after ");
+                buf.push_str((position - 1).to_string().as_str());
+                buf.push_str(" ;\n    faldo:before ");
+                buf.push_str(position.to_string().as_str());
+                if let Some(Some(seq)) = seq {
+                    buf.push_str(" ;\n    faldo:reference ");
+                    buf.push_iri(seq);
+                }
+            }
+            (r, a) if r == a => {
+                // MNV
+                let p1 = position;
+                let p2 = position + reference.map_or(0, |v| v.len() as i64 - 1);
+                buf.push_str("\n    a faldo:Region ;");
+                buf.push_str("\n    faldo:begin ");
+                buf.push_str(p1.to_string().as_str());
+                buf.push_str(" ;\n    faldo:end ");
+                buf.push_str(p2.to_string().as_str());
+                if let Some(Some(seq)) = seq {
+                    buf.push_str(" ;\n    faldo:reference ");
+                    buf.push_iri(seq);
+                }
+            }
+            (_, _) => {
+                // Deletion, Indel
+                let p1 = position;
+                let p2 = position + reference.map_or(0, |v| v.len() as i64 - 1);
                 buf.push_str("\n    a faldo:Region ;");
                 buf.push_str("\n    faldo:begin [");
                 buf.push_str("\n      a faldo:InBetweenPosition ;");
                 buf.push_str("\n      faldo:after ");
-                buf.push_str((begin - 1).to_string().as_str());
+                buf.push_str((p1 - 1).to_string().as_str());
                 buf.push_str(" ;\n      faldo:before ");
-                buf.push_str(begin.to_string().as_str());
-                if let Some(ref reference) = self.sequence.reference {
+                buf.push_str(p1.to_string().as_str());
+                if let Some(Some(seq)) = seq {
                     buf.push_str(" ;\n    faldo:reference ");
-                    buf.push_iri(reference.as_str());
+                    buf.push_iri(seq);
                 }
                 buf.push_str("\n    ] ;");
 
                 buf.push_str("\n    faldo:end [");
                 buf.push_str("\n      a faldo:InBetweenPosition ;");
                 buf.push_str("\n      faldo:after ");
-                buf.push_str(end.to_string().as_str());
+                buf.push_str(p2.to_string().as_str());
                 buf.push_str(" ;\n      faldo:before ");
-                buf.push_str((end + 1).to_string().as_str());
-                if let Some(ref reference) = self.sequence.reference {
+                buf.push_str((p2 + 1).to_string().as_str());
+                if let Some(Some(seq)) = seq {
                     buf.push_str(" ;\n    faldo:reference ");
-                    buf.push_iri(reference.as_str());
+                    buf.push_iri(seq);
                 }
                 buf.push_str("\n    ]");
             }
-            AlterationPosition::Insertion(begin, end) => {
-                buf.push_str("\n    a faldo:InBetweenPosition ;");
-                buf.push_str("\n    faldo:after ");
-                buf.push_str(begin.to_string().as_str());
-                buf.push_str(" ;\n    faldo:before ");
-                buf.push_str(end.to_string().as_str());
-                if let Some(ref reference) = self.sequence.reference {
-                    buf.push_str(" ;\n    faldo:reference ");
-                    buf.push_iri(reference.as_str());
-                }
-            }
-            AlterationPosition::MNV(begin, end) => {
-                buf.push_str("\n    a faldo:Region ;");
-                buf.push_str("\n    faldo:begin ");
-                buf.push_str(begin.to_string().as_str());
-                buf.push_str(" ;\n    faldo:end ");
-                buf.push_str(end.to_string().as_str());
-                if let Some(ref reference) = self.sequence.reference {
-                    buf.push_str(" ;\n    faldo:reference ");
-                    buf.push_iri(reference.as_str());
-                }
-            }
         };
+
         buf.push_str("\n  ]");
     }
 
     fn write_info(&self, buf: &mut Buffer) {
-        let info = self.info;
-        if info.len() > 0 {
+        let info = self.record.info();
+        if !info.is_empty() {
             buf.push_str(" ;\n  gvo:info");
 
             for (i, info) in info.iter().enumerate() {
@@ -193,14 +223,14 @@ impl Record<'_> {
                     }
                     (vs, bcf::header::TagLength::AltAlleles) => {
                         for (i, v) in vs.iter().enumerate() {
-                            if i == self.allele_index {
+                            if i == self.index {
                                 self.push_info_value(buf, v);
                             }
                         }
                     }
                     (vs, bcf::header::TagLength::Alleles) => {
                         let r = &vs.get(0);
-                        let a = &vs.get(self.allele_index + 1);
+                        let a = &vs.get(self.index + 1);
 
                         match (&r, &a) {
                             (Some(r), Some(a)) => {
