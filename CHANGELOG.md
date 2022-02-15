@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 
+## [1.0.0-beta.6] - 2022-02-15
+### Changed
+- Refactor modules
+- Add options for subject URI generation
+- Add an option not to normalize faldo representation
+
 ## [1.0.0-beta.5] - 2021-08-06
 ### Changed
 - Do not output identifier if value of `ID` column is "."
@@ -24,7 +30,8 @@ All notable changes to this project will be documented in this file.
 ### Implemented
 - Initial version of converter
 
-[Unreleased]: https://github.com/togovar/vcf2rdf/compare/v1.0.0-beta.5...HEAD
+[Unreleased]: https://github.com/togovar/vcf2rdf/compare/v1.0.0-beta.6...HEAD
+[1.0.0-beta.6]: https://github.com/togovar/vcf2rdf/releases/tag/v1.0.0-beta.6
 [1.0.0-beta.5]: https://github.com/togovar/vcf2rdf/releases/tag/v1.0.0-beta.5
 [1.0.0-beta.4]: https://github.com/togovar/vcf2rdf/releases/tag/v1.0.0-beta.4
 [1.0.0-beta.3]: https://github.com/togovar/vcf2rdf/releases/tag/v1.0.0-beta.3

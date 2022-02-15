@@ -46,6 +46,7 @@ FLAGS:
     -V, --version    Prints version information
 
 SUBCOMMANDS:
+    compress    Compress VCF to BGZF
     convert     Converts VCF to RDF
     generate    Generates template
     help        Prints this message or the help of the given subcommand(s)
@@ -66,7 +67,7 @@ $ tabix input.vcf.gz
 To generate configuration template:
 
 ```shell
-$ vcf2rdf generate config -a GRCh38 input.vcf.gz > config.yaml
+$ vcf2rdf generate config --assembly GRCh38 input.vcf.gz > config.yaml
 ```
 
 then output:
@@ -89,9 +90,9 @@ info:
 
 # Sequence reference mapping.
 reference:
-  "1":           # Value of CHROM column
-    name: ~      # Value used to location-based subject
-    reference: ~ # URI for faldo:reference
+  "1":           # The value of CHROM column
+    name: ~      # Used if --subject=location or --subject=normalized_location are passed to the converter
+    reference: ~ # Used for URI of faldo:reference / if --subject=reference or --subject=normalized_reference are passed to the converter
   ...
 ```
 
@@ -120,7 +121,7 @@ ARGS:
 To convert VCF:
 
 ```shell
-$ vcf2rdf convert -c config.yaml input.vcf.gz > output.ttl
+$ vcf2rdf convert --config config.yaml input.vcf.gz > output.ttl
 ```
 
 The usage of the `convert` command is as follows.
@@ -130,14 +131,16 @@ USAGE:
     vcf2rdf convert [FLAGS] [OPTIONS] <input> --config <config>
 
 FLAGS:
-    -h, --help         Prints help information
-        --rehearsal    Processes only one record and exit
-    -V, --version      Prints version information
+    -h, --help            Prints help information
+        --no-normalize    Do not normalize faldo representation
+        --rehearsal       Processes only one record and exit
+    -V, --version         Prints version information
 
 OPTIONS:
     -c, --config <config>      Path to configuration yaml
     -s, --subject <subject>    Strategy to generate a subject (use blank node if not specified). If use `id`, ensure
-                               that all values at ID column are present and unique [possible values: id, location]
+                               that all values at ID column are present and unique [possible values: id, location,
+                               reference, normalized_location, normalized_reference]
 
 ARGS:
     <input>    Path to file to process
@@ -146,6 +149,6 @@ ARGS:
 #### Use docker
 
 ```shell
-$ docker run --rm -v $(pwd):/work togovar/vcf2rdf vcf2rdf generate config -a GRCh38 /work/input.vcf.gz > config.yaml
-$ docker run --rm -v $(pwd):/work togovar/vcf2rdf vcf2rdf convert -c /work/config.yaml /work/input.vcf.gz > output.ttl
+$ docker run --rm -v $(pwd):/work togovar/vcf2rdf vcf2rdf generate config --assembly GRCh38 /work/input.vcf.gz > config.yaml
+$ docker run --rm -v $(pwd):/work togovar/vcf2rdf vcf2rdf convert --config /work/config.yaml /work/input.vcf.gz > output.ttl
 ```
