@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 
+## [1.0.0-beta.8] - 2022-02-27
+### Changed
+- Skip record if its reference sequence is undefined
+
 ## [1.0.0-beta.7] - 2022-02-27
 ### Changed
 - Assign gvo:Variation to no variant record
@@ -35,7 +39,8 @@ All notable changes to this project will be documented in this file.
 ### Implemented
 - Initial version of converter
 
-[Unreleased]: https://github.com/togovar/vcf2rdf/compare/v1.0.0-beta.7...HEAD
+[Unreleased]: https://github.com/togovar/vcf2rdf/compare/v1.0.0-beta.8...HEAD
+[1.0.0-beta.8]: https://github.com/togovar/vcf2rdf/releases/tag/v1.0.0-beta.8
 [1.0.0-beta.7]: https://github.com/togovar/vcf2rdf/releases/tag/v1.0.0-beta.7
 [1.0.0-beta.6]: https://github.com/togovar/vcf2rdf/releases/tag/v1.0.0-beta.6
 [1.0.0-beta.5]: https://github.com/togovar/vcf2rdf/releases/tag/v1.0.0-beta.5
