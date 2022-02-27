@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 
+## [1.0.0-beta.7] - 2022-02-27
+### Changed
+- Assign gvo:Variation to no variant record
+- Suppress redundant output if info is empty
+
 ## [1.0.0-beta.6] - 2022-02-15
 ### Changed
 - Refactor modules
@@ -30,7 +35,8 @@ All notable changes to this project will be documented in this file.
 ### Implemented
 - Initial version of converter
 
-[Unreleased]: https://github.com/togovar/vcf2rdf/compare/v1.0.0-beta.6...HEAD
+[Unreleased]: https://github.com/togovar/vcf2rdf/compare/v1.0.0-beta.7...HEAD
+[1.0.0-beta.7]: https://github.com/togovar/vcf2rdf/releases/tag/v1.0.0-beta.7
 [1.0.0-beta.6]: https://github.com/togovar/vcf2rdf/releases/tag/v1.0.0-beta.6
 [1.0.0-beta.5]: https://github.com/togovar/vcf2rdf/releases/tag/v1.0.0-beta.5
 [1.0.0-beta.4]: https://github.com/togovar/vcf2rdf/releases/tag/v1.0.0-beta.4

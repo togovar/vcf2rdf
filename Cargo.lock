@@ -727,7 +727,7 @@ dependencies = [
 
 [[package]]
 name = "vcf2rdf"
-version = "1.0.0-beta.6"
+version = "1.0.0-beta.7"
 dependencies = [
  "anyhow",
  "env_logger",
