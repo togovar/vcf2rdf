@@ -69,6 +69,8 @@ impl<W: Write> AsTurtle<W> for Entry<'_> {
         if let Some(v) = vc.as_ref() {
             buf.push_str(" a gvo:");
             buf.push_str(v.to_str());
+        } else {
+            buf.push_str(" a gvo:Variation");
         };
 
         let id = unsafe { String::from_utf8_unchecked(self.record.inner.id()) };
@@ -175,7 +177,7 @@ impl Entry<'_> {
                 buf.push_str(" ;\n      faldo:before ");
                 buf.push_str(p1.to_string().as_str());
                 if let Some(Some(seq)) = seq {
-                    buf.push_str(" ;\n    faldo:reference ");
+                    buf.push_str(" ;\n      faldo:reference ");
                     buf.push_iri(seq);
                 }
                 buf.push_str("\n    ] ;");
@@ -187,7 +189,7 @@ impl Entry<'_> {
                 buf.push_str(" ;\n      faldo:before ");
                 buf.push_str((p2 + 1).to_string().as_str());
                 if let Some(Some(seq)) = seq {
-                    buf.push_str(" ;\n    faldo:reference ");
+                    buf.push_str(" ;\n      faldo:reference ");
                     buf.push_iri(seq);
                 }
                 buf.push_str("\n    ]");
@@ -256,8 +258,6 @@ impl Entry<'_> {
 
                 buf.push_str("\n  ]");
             }
-        } else {
-            buf.push_str(" ;\n  gvo:info []");
         }
     }
 
