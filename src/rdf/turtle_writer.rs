@@ -135,7 +135,6 @@ pub struct TurtleWriter<'a, W: Write> {
     info_key: Option<&'a Vec<String>>,
     pub subject_id: Option<Subject>,
     subject_formatter: SubjectFormatter,
-    // normalize: bool,
 }
 
 #[derive(Debug)]
@@ -188,11 +187,6 @@ impl<'a, W: Write> TurtleWriter<'a, W> {
         self.subject_formatter = formatter;
         self
     }
-    //
-    // pub fn normalize(&mut self, flag: bool) -> &TurtleWriter<'a, W> {
-    //     self.normalize = flag;
-    //     self
-    // }
 
     fn write_headers(&mut self) -> Result<()> {
         let mut buf = String::with_capacity(4096);
