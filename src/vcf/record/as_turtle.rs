@@ -46,6 +46,15 @@ impl<W: Write> AsTurtle<W> for Entry<'_> {
     {
         let mut buf = Buffer::default();
 
+        if self
+            .record
+            .sequence()
+            .and_then(|x| x.reference.as_ref())
+            .is_none()
+        {
+            return Ok(None);
+        }
+
         match wtr.format_subject(&self) {
             Some(v) => {
                 buf.push_str("<");
