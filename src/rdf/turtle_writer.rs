@@ -1,6 +1,10 @@
+use log::*;
+use once_cell::sync::Lazy;
+use regex::Regex;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
+use vcf_lib::record::normalize;
 
 use crate::cli::converter::Subject;
 use crate::errors::Result;
@@ -26,8 +30,8 @@ impl Default for SubjectFormatter {
     }
 }
 
-impl From<&crate::cli::converter::Subject> for SubjectFormatter {
-    fn from(v: &crate::cli::converter::Subject) -> Self {
+impl From<&Subject> for SubjectFormatter {
+    fn from(v: &Subject) -> Self {
         match v {
             Subject::ID => SubjectFormatter {
                 func: |entry: &Entry| unsafe {
@@ -46,8 +50,8 @@ impl From<&crate::cli::converter::Subject> for SubjectFormatter {
                                 "{}-{}-{}-{}",
                                 name,
                                 entry.position(),
-                                entry.reference_bases().unwrap_or(""),
-                                entry.alternate_bases().unwrap_or("")
+                                entry.reference_bases(),
+                                entry.alternate_bases()
                             ))
                         } else {
                             None
@@ -65,8 +69,8 @@ impl From<&crate::cli::converter::Subject> for SubjectFormatter {
                                 "{}#{}-{}-{}",
                                 uri,
                                 entry.position(),
-                                entry.reference_bases().unwrap_or(""),
-                                entry.alternate_bases().unwrap_or("")
+                                entry.reference_bases(),
+                                entry.alternate_bases()
                             ))
                         } else {
                             None
@@ -77,45 +81,43 @@ impl From<&crate::cli::converter::Subject> for SubjectFormatter {
                 },
             },
             Subject::NormalizedLocation => SubjectFormatter {
-                func: |entry: &Entry| {
-                    let (position, reference, alternate, _) = entry.normalize();
-
-                    if let Some(seq) = entry.record().sequence() {
-                        if let Some(name) = seq.name.as_ref() {
-                            Some(format!(
-                                "{}-{}-{}-{}",
-                                name,
-                                position,
-                                reference.unwrap_or(""),
-                                alternate.unwrap_or("")
-                            ))
+                func: |entry: &Entry| match normalize(
+                    entry.position(),
+                    entry.reference_bases(),
+                    entry.alternate_bases(),
+                ) {
+                    Ok((position, reference, alternate)) => {
+                        if let Some(seq) = entry.record().sequence() {
+                            if let Some(name) = seq.name.as_ref() {
+                                Some(format!("{}-{}-{}-{}", name, position, reference, alternate))
+                            } else {
+                                None
+                            }
                         } else {
                             None
                         }
-                    } else {
-                        None
                     }
+                    Err(_) => None,
                 },
             },
             Subject::NormalizedReference => SubjectFormatter {
-                func: |entry: &Entry| {
-                    let (position, reference, alternate, _) = entry.normalize();
-
-                    if let Some(seq) = entry.record().sequence() {
-                        if let Some(uri) = seq.reference.as_ref() {
-                            Some(format!(
-                                "{}#{}-{}-{}",
-                                uri,
-                                position,
-                                reference.unwrap_or(""),
-                                alternate.unwrap_or("")
-                            ))
+                func: |entry: &Entry| match normalize(
+                    entry.position(),
+                    entry.reference_bases(),
+                    entry.alternate_bases(),
+                ) {
+                    Ok((position, reference, alternate)) => {
+                        if let Some(seq) = entry.record().sequence() {
+                            if let Some(uri) = seq.reference.as_ref() {
+                                Some(format!("{}#{}-{}-{}", uri, position, reference, alternate))
+                            } else {
+                                None
+                            }
                         } else {
                             None
                         }
-                    } else {
-                        None
                     }
+                    Err(_) => None,
                 },
             },
         }
@@ -212,16 +214,6 @@ impl<'a, W: Write> TurtleWriter<'a, W> {
 
         Ok(self.wtr.write_all(buf.as_bytes())?)
     }
-}
-
-impl<'a, W: Write> Writer for TurtleWriter<'a, W> {
-    fn write_record<'b>(&mut self, record: &Record<'b>) -> Result<()> {
-        for e in record.each_alternate_alleles() {
-            self.write_entry(&e)?;
-        }
-
-        Ok(())
-    }
 
     fn write_entry(&mut self, entry: &Entry) -> Result<()> {
         if let HeaderState::DidNotWrite = self.state.header {
@@ -231,6 +223,38 @@ impl<'a, W: Write> Writer for TurtleWriter<'a, W> {
 
         if let Some(r) = entry.as_ttl_string(&self)? {
             self.wtr.write_all(r.as_bytes())?;
+        }
+
+        Ok(())
+    }
+}
+
+static REGEX_ALLELES: Lazy<Regex> = Lazy::new(|| Regex::new(r"\A[ACGT]+\z").unwrap());
+
+impl<'a, W: Write> Writer for TurtleWriter<'a, W> {
+    fn write_record<'b>(&mut self, record: &Record<'b>) -> Result<()> {
+        for e in record.each_alternate_alleles() {
+            if e.reference_bases().len() == 0 {
+                warn!("Reference bases must not be empty. {}", e);
+                continue;
+            }
+
+            if e.alternate_bases().len() == 0 {
+                warn!("Alternate bases must not be empty. {}", e);
+                continue;
+            }
+
+            if !REGEX_ALLELES.is_match(e.reference_bases()) {
+                warn!("Reference bases contains non-ACGT characters. {}", e);
+                continue;
+            }
+
+            if !REGEX_ALLELES.is_match(e.alternate_bases()) {
+                warn!("Alternate bases contains non-ACGT characters. {}", e);
+                continue;
+            }
+
+            self.write_entry(&e)?;
         }
 
         Ok(())

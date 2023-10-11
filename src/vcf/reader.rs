@@ -1,23 +1,16 @@
 use std::collections::BTreeMap;
 use std::ffi::{CString, OsString};
-use std::fs::File;
-use std::io;
-use std::io::{BufRead, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use log::*;
 use rust_htslib::bcf;
 use rust_htslib::bcf::Read;
 use rust_htslib::errors::Error as htslib_error;
 use rust_htslib::htslib;
-use tempfile::TempDir;
 
 use crate::config::Sequence;
 use crate::errors::{Error, Result};
 use crate::vcf::record;
-
-const FILENAME_STDIN: &'static str = "stdin.vcf";
 
 #[derive(Debug)]
 pub struct ReaderBuilder {
@@ -52,7 +45,7 @@ impl ReaderBuilder {
 
     pub fn path<P: AsRef<Path>>(&self, path: P) -> Result<Reader> {
         match path.as_ref().to_str() {
-            Some(p) if path.as_ref().exists() => self.build(p, None),
+            Some(p) if path.as_ref().exists() => self.build(p),
             Some(p) if !path.as_ref().exists() => Err(Error::FileNotFoundError(p.to_string()))?,
             _ => Err(Error::FilePathError(
                 path.as_ref().to_string_lossy().to_string(),
@@ -60,38 +53,7 @@ impl ReaderBuilder {
         }
     }
 
-    pub fn stdin(&self) -> Result<Reader> {
-        let stdin = io::stdin();
-        let stdin = stdin.lock();
-
-        self.reader(stdin)
-    }
-
-    pub fn reader<R: BufRead>(&self, mut reader: R) -> Result<Reader> {
-        let tmp_dir = TempDir::new()?;
-        debug!("Create temporary directory: {:?}", tmp_dir);
-
-        let tmp_file = tmp_dir.path().join(FILENAME_STDIN);
-
-        let mut writer = BufWriter::new(File::create(&tmp_file)?);
-        let mut buf = Vec::new();
-
-        debug!("Reading contents from stdin...");
-        while reader.read_until(b'\n', &mut buf)? != 0 {
-            writer.write_all(buf.as_ref())?;
-            buf.clear();
-        }
-        writer.flush()?;
-        debug!("Contents from stdin stored to {:?}", tmp_file);
-
-        match tmp_file.to_str() {
-            Some(p) if tmp_file.exists() => self.build(p, Some(tmp_dir)),
-            Some(p) => Err(Error::FileNotFoundError(p.to_string())),
-            None => Err(Error::FilePathError(tmp_file.to_string_lossy().to_string())),
-        }
-    }
-
-    fn build(&self, path: &str, temp_dir: Option<TempDir>) -> Result<Reader> {
+    fn build(&self, path: &str) -> Result<Reader> {
         if let Some(p) = Self::tbi_path(path) {
             if !p.exists() {
                 Err(Error::IndexNotFoundError(p.to_string_lossy().to_string()))?;
@@ -112,14 +74,13 @@ impl ReaderBuilder {
         };
 
         Ok(Reader {
-            reader: rust_htslib::bcf::Reader::from_path(path)?,
+            reader: bcf::Reader::from_path(path)?,
             references: self.references(path),
             filters: self.filters(path),
             info,
             info_keys,
             normalize: self.normalize,
             tbx,
-            temp_dir,
         })
     }
 
@@ -139,7 +100,7 @@ impl ReaderBuilder {
     fn references(&self, path: &str) -> BTreeMap<u32, Sequence> {
         let mut map = BTreeMap::new();
 
-        if let Ok(reader) = rust_htslib::bcf::Reader::from_path(path) {
+        if let Ok(reader) = bcf::Reader::from_path(path) {
             reader.header().header_records().iter().for_each(|x| {
                 if let bcf::HeaderRecord::Contig { key: _key, values } = x {
                     if let Some(Ok(idx)) = values.get("IDX").map(|v| u32::from_str(v)) {
@@ -159,7 +120,7 @@ impl ReaderBuilder {
     fn filters(&self, path: &str) -> BTreeMap<u32, String> {
         let mut map = BTreeMap::new();
 
-        if let Ok(reader) = rust_htslib::bcf::Reader::from_path(path) {
+        if let Ok(reader) = bcf::Reader::from_path(path) {
             reader.header().header_records().iter().for_each(|x| {
                 if let bcf::HeaderRecord::Filter { values, .. } = x {
                     if let Some(v) = values.get("ID") {
@@ -177,7 +138,7 @@ impl ReaderBuilder {
     fn info(&self, path: &str) -> BTreeMap<String, (bcf::header::TagType, bcf::header::TagLength)> {
         let mut map = BTreeMap::new();
 
-        if let Ok(reader) = rust_htslib::bcf::Reader::from_path(path) {
+        if let Ok(reader) = bcf::Reader::from_path(path) {
             reader.header().header_records().iter().for_each(|x| {
                 if let bcf::HeaderRecord::Info { values, .. } = x {
                     if let Some(v) = values.get("ID") {
@@ -206,7 +167,6 @@ pub struct Reader {
     info_keys: Vec<String>,
     normalize: bool,
     tbx: *mut htslib::tbx_t,
-    temp_dir: Option<TempDir>,
 }
 
 impl Reader {
@@ -391,7 +351,7 @@ mod tests {
         assert_eq!(vcf.count(), 250);
     }
 
-    fn read_vcf_as_vec<P: AsRef<Path>>(path: P) -> Vec<rust_htslib::bcf::Record> {
+    fn read_vcf_as_vec<P: AsRef<Path>>(path: P) -> Vec<bcf::Record> {
         let mut vcf = Reader::from_path(path).expect("Error opening file.");
         vcf.reader
             .records()
@@ -399,7 +359,7 @@ mod tests {
             .collect()
     }
 
-    fn read_dbsnp_example_as_vec() -> Vec<rust_htslib::bcf::Record> {
+    fn read_dbsnp_example_as_vec() -> Vec<bcf::Record> {
         read_vcf_as_vec("test/dbsnp_example.vcf.gz")
     }
 

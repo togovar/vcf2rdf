@@ -69,9 +69,7 @@ pub fn run(options: Options) -> Result<()> {
     for record in reader.records() {
         let record = record?;
 
-        for entry in record.each_alternate_alleles() {
-            writer.write_entry(&entry)?;
-        }
+        writer.write_record(&record)?;
 
         if options.rehearsal {
             break;

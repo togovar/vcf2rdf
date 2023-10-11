@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::convert::TryFrom;
 use std::path::PathBuf;
 
 use structopt::StructOpt;
@@ -8,7 +7,7 @@ use strum::{EnumString, EnumVariantNames};
 
 use crate::config::{Config, Sequence};
 use crate::errors::Result;
-use crate::vcf::assembly;
+use crate::vcf::assembly::{GRCH37_P13, GRCH38_P13, GRCM38, GRCM39};
 use crate::vcf::reader::Reader;
 
 #[derive(EnumString, EnumVariantNames, Debug)]
@@ -43,12 +42,18 @@ pub fn run(command: Options) -> Result<()> {
             let vcf = Reader::from_path(input)?;
 
             let assembly = match assembly.as_ref() {
-                Some(v) => assembly::Assembly::try_from(v).ok(),
+                Some(v) => match v {
+                    Assembly::GRCH37 => Some(GRCH37_P13.clone()),
+                    Assembly::GRCH38 => Some(GRCH38_P13.clone()),
+                    Assembly::GRCM38 => Some(GRCM38.clone()),
+                    Assembly::GRCM39 => Some(GRCM39.clone()),
+                },
                 None => None,
             };
 
             let mut reference = BTreeMap::new();
             for (_, name) in vcf.contigs().iter() {
+                // TODO: M -> MT
                 let seq = assembly
                     .as_ref()
                     .map(|x| {

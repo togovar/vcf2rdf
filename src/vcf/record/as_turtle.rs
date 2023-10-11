@@ -1,6 +1,8 @@
 use std::io::Write;
 
 use rust_htslib::bcf;
+use vcf_lib::record::{normalize, variant_type};
+use vcf_lib::VariantType;
 
 use crate::errors::Result;
 use crate::rdf::turtle_writer::{AsTurtle, TurtleWriter};
@@ -64,20 +66,23 @@ impl<W: Write> AsTurtle<W> for Entry<'_> {
             None => buf.push_str("[]"),
         }
 
-        let (pos, reference, alternate, vc) = self.normalize();
-        let (pos, reference, alternate) = if self.record.normalize {
-            (pos, reference, alternate)
-        } else {
-            (
-                self.position(),
-                self.reference_bases(),
-                self.alternate_bases(),
-            )
-        };
+        let (n_pos, n_reference, n_alternate) = normalize(
+            self.position(),
+            self.reference_bases(),
+            self.alternate_bases(),
+        )?;
 
-        if let Some(v) = vc.as_ref() {
+        let variant_type = variant_type(n_reference, n_alternate);
+
+        if let Some(typ) = variant_type.as_ref() {
             buf.push_str(" a gvo:");
-            buf.push_str(v.to_str());
+            buf.push_str(match typ {
+                VariantType::SNV => "SNV",
+                VariantType::Deletion => "Deletion",
+                VariantType::Insertion => "Insertion",
+                VariantType::Indel => "Indel",
+                VariantType::MNV => "MNV",
+            });
         } else {
             buf.push_str(" a gvo:Variation");
         };
@@ -88,13 +93,57 @@ impl<W: Write> AsTurtle<W> for Entry<'_> {
             buf.push_quoted(&id, '"');
         }
 
-        self.write_location(&mut buf, pos, reference, alternate);
+        self.write_location(&mut buf, n_pos, n_reference, n_alternate);
 
-        buf.push_str(" ;\n  gvo:ref ");
-        buf.push_quoted(reference.unwrap_or(""), '"');
+        if self.record.normalize {
+            buf.push_str(" ;\n  gvo:pos ");
+            buf.push_str(
+                match variant_type {
+                    Some(VariantType::Insertion) | Some(VariantType::Deletion) => n_pos + 1,
+                    _ => n_pos,
+                }
+                .to_string()
+                .as_str(),
+            );
 
-        buf.push_str(" ;\n  gvo:alt ");
-        buf.push_quoted(alternate.unwrap_or(""), '"');
+            buf.push_str(" ;\n  gvo:ref ");
+            buf.push_quoted(
+                match variant_type {
+                    Some(VariantType::Insertion) => "",
+                    Some(VariantType::Deletion) => &n_reference[1..],
+                    _ => n_reference,
+                },
+                '"',
+            );
+
+            buf.push_str(" ;\n  gvo:alt ");
+            buf.push_quoted(
+                match variant_type {
+                    Some(VariantType::Deletion) => "",
+                    Some(VariantType::Insertion) => &n_alternate[1..],
+                    _ => n_alternate,
+                },
+                '"',
+            );
+
+            buf.push_str(" ;\n  gvo:pos_vcf ");
+            buf.push_str(n_pos.to_string().as_str());
+
+            buf.push_str(" ;\n  gvo:ref_vcf ");
+            buf.push_quoted(n_reference, '"');
+
+            buf.push_str(" ;\n  gvo:alt_vcf ");
+            buf.push_quoted(n_alternate, '"');
+        } else {
+            buf.push_str(" ;\n  gvo:pos ");
+            buf.push_str(self.position().to_string().as_str());
+
+            buf.push_str(" ;\n  gvo:ref ");
+            buf.push_quoted(self.reference_bases(), '"');
+
+            buf.push_str(" ;\n  gvo:alt ");
+            buf.push_quoted(self.alternate_bases(), '"');
+        };
 
         let quality = self.record.quality();
         if quality.is_finite() {
@@ -123,22 +172,19 @@ impl<W: Write> AsTurtle<W> for Entry<'_> {
 }
 
 impl Entry<'_> {
-    fn write_location(
-        &self,
-        buf: &mut Buffer,
-        position: i64,
-        reference: Option<&str>,
-        alternate: Option<&str>,
-    ) {
+    fn write_location(&self, buf: &mut Buffer, position: u64, reference: &str, alternate: &str) {
+        let typ = variant_type(reference, alternate);
+
+        if typ.is_none() {
+            return;
+        }
+
         let seq = self.record.sequence().map(|x| x.reference.as_ref());
 
         buf.push_str(" ;\n  faldo:location [");
 
-        match (
-            reference.map_or(0, |v| v.len()),
-            alternate.map_or(0, |v| v.len()),
-        ) {
-            (1, 1) => {
+        match typ {
+            Some(VariantType::SNV) => {
                 // SNV
                 buf.push_str("\n    a faldo:ExactPosition ;");
                 buf.push_str("\n    faldo:position ");
@@ -148,22 +194,10 @@ impl Entry<'_> {
                     buf.push_iri(seq);
                 }
             }
-            (0, _) => {
-                // Insertion
-                buf.push_str("\n    a faldo:InBetweenPosition ;");
-                buf.push_str("\n    faldo:after ");
-                buf.push_str((position - 1).to_string().as_str());
-                buf.push_str(" ;\n    faldo:before ");
-                buf.push_str(position.to_string().as_str());
-                if let Some(Some(seq)) = seq {
-                    buf.push_str(" ;\n    faldo:reference ");
-                    buf.push_iri(seq);
-                }
-            }
-            (r, a) if r == a => {
+            Some(VariantType::MNV) => {
                 // MNV
                 let p1 = position;
-                let p2 = position + reference.map_or(0, |v| v.len() as i64 - 1);
+                let p2 = position + reference.len() as u64 - 1;
                 buf.push_str("\n    a faldo:Region ;");
                 buf.push_str("\n    faldo:begin ");
                 buf.push_str(p1.to_string().as_str());
@@ -174,10 +208,51 @@ impl Entry<'_> {
                     buf.push_iri(seq);
                 }
             }
-            (_, _) => {
-                // Deletion, Indel
+            Some(VariantType::Insertion) => {
+                // Insertion
+                buf.push_str("\n    a faldo:InBetweenPosition ;");
+                buf.push_str("\n    faldo:after ");
+                buf.push_str(position.to_string().as_str());
+                buf.push_str(" ;\n    faldo:before ");
+                buf.push_str((position + 1).to_string().as_str());
+                if let Some(Some(seq)) = seq {
+                    buf.push_str(" ;\n    faldo:reference ");
+                    buf.push_iri(seq);
+                }
+            }
+            Some(VariantType::Deletion) => {
+                // Deletion
                 let p1 = position;
-                let p2 = position + reference.map_or(0, |v| v.len() as i64 - 1);
+                let p2 = position + reference.len() as u64 - 1;
+                buf.push_str("\n    a faldo:Region ;");
+                buf.push_str("\n    faldo:begin [");
+                buf.push_str("\n      a faldo:InBetweenPosition ;");
+                buf.push_str("\n      faldo:after ");
+                buf.push_str(p1.to_string().as_str());
+                buf.push_str(" ;\n      faldo:before ");
+                buf.push_str((p1 + 1).to_string().as_str());
+                if let Some(Some(seq)) = seq {
+                    buf.push_str(" ;\n      faldo:reference ");
+                    buf.push_iri(seq);
+                }
+                buf.push_str("\n    ] ;");
+
+                buf.push_str("\n    faldo:end [");
+                buf.push_str("\n      a faldo:InBetweenPosition ;");
+                buf.push_str("\n      faldo:after ");
+                buf.push_str(p2.to_string().as_str());
+                buf.push_str(" ;\n      faldo:before ");
+                buf.push_str((p2 + 1).to_string().as_str());
+                if let Some(Some(seq)) = seq {
+                    buf.push_str(" ;\n      faldo:reference ");
+                    buf.push_iri(seq);
+                }
+                buf.push_str("\n    ]");
+            }
+            _ => {
+                // Indel
+                let p1 = position;
+                let p2 = position + reference.len() as u64 - 1;
                 buf.push_str("\n    a faldo:Region ;");
                 buf.push_str("\n    faldo:begin [");
                 buf.push_str("\n      a faldo:InBetweenPosition ;");

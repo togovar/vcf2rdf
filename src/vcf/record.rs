@@ -236,12 +236,13 @@ impl<'a> Display for Entry<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "chrom: {:?}, pos: {}, ref: {:?}, alt: {:?}, normalized: {:?}",
-            self.chromosome(),
+            "chrom: {:?}, pos: {}, ref: {:?}, alt: {:?}",
+            self.chromosome()
+                .and_then(|x| Some(x.unwrap_or("?")))
+                .unwrap_or("?"),
             self.position(),
             self.reference_bases(),
             self.alternate_bases(),
-            self.normalize(),
         )
     }
 }
@@ -267,8 +268,8 @@ impl<'a> Entry<'a> {
     }
 
     // `bcf::record::Record.pos()` returns 0-based position
-    pub fn position(&self) -> i64 {
-        self.record.inner().pos() + 1
+    pub fn position(&self) -> u64 {
+        self.record.inner().pos() as u64 + 1
     }
 
     pub fn id(&self) -> Option<String> {
@@ -279,73 +280,107 @@ impl<'a> Entry<'a> {
         }
     }
 
-    pub fn reference_bases(&self) -> Option<&str> {
+    pub fn reference_bases(&self) -> &str {
         self.record
             .inner()
             .alleles()
             .first()
-            .and_then(|&x| match x {
-                b"" | b"." => None,
-                _ => Some(unsafe { std::str::from_utf8_unchecked(x) }),
-            })
+            .map_or("", |&x| unsafe { std::str::from_utf8_unchecked(x) })
     }
 
-    pub fn alternate_bases(&self) -> Option<&str> {
-        match self.alternate_allele {
-            b"" | b"." => None,
-            v => Some(unsafe { std::str::from_utf8_unchecked(v) }),
-        }
+    pub fn alternate_bases(&self) -> &str {
+        unsafe { std::str::from_utf8_unchecked(self.alternate_allele) }
     }
 
-    pub fn normalize(&self) -> (i64, Option<&str>, Option<&str>, Option<VarType>) {
-        let (pos, reference, alternate) = Self::normaliza_position(
-            self.position(),
-            self.reference_bases(),
-            self.alternate_bases(),
-        );
-
-        let class = Self::variant_type(reference, alternate);
-
-        (pos, reference, alternate, class)
-    }
-
-    fn normaliza_position<'b>(
-        position: i64,
-        reference: Option<&'b str>,
-        alternate: Option<&'b str>,
-    ) -> (i64, Option<&'b str>, Option<&'b str>) {
-        match (reference, alternate) {
-            (None, alternate) => (position, None, alternate),
-            (Some(reference), None) => (position, Some(reference), None),
-            (Some(reference), Some(alternate)) => {
-                let mut itr_r = reference.chars();
-                let mut itr_a = alternate.chars();
-                let mut i: usize = 0;
-                while let (Some(c1), Some(c2)) = (itr_r.next(), itr_a.next()) {
-                    if c1 == c2 {
-                        i += 1
-                    } else {
-                        break;
-                    }
-                }
-
-                (
-                    position + i as i64,
-                    reference.get(i..).filter(|v| !v.is_empty()),
-                    alternate.get(i..).filter(|v| !v.is_empty()),
-                )
-            }
-        }
-    }
-
-    fn variant_type(reference: Option<&str>, alternate: Option<&str>) -> Option<VarType> {
-        match (reference, alternate) {
-            (Some(r), Some(a)) if r.len() == 1 && a.len() == 1 => Some(VarType::SNV),
-            (Some(r), Some(a)) if r.len() == a.len() => Some(VarType::MNV),
-            (Some(_), None) => Some(VarType::Deletion),
-            (None, Some(_)) => Some(VarType::Insertion),
-            (Some(_), Some(_)) => Some(VarType::Indel),
-            (None, None) => None,
-        }
-    }
+    // pub fn normalize(&self) -> (u64, &str, &str, Option<VariantType>) {
+    //     let (pos, reference, alternate) = normalize(
+    //         self.position(),
+    //         self.reference_bases(),
+    //         self.alternate_bases(),
+    //     )?;
+    //
+    //     let class = variant_type(reference, alternate);
+    //
+    //     (pos, reference, alternate, class)
+    // }
+    //
+    // fn normaliza_position<'b>(
+    //     position: i64,
+    //     reference: Option<&'b str>,
+    //     alternate: Option<&'b str>,
+    // ) -> (i64, Option<&'b str>, Option<&'b str>) {
+    //     match (reference, alternate) {
+    //         (None, alternate) => (position, None, alternate),
+    //         (Some(reference), None) => (position, Some(reference), None),
+    //         (Some(reference), Some(alternate)) => {
+    //             let (r, a) = Self::trim_trailing_shared_bases(reference, alternate);
+    //             let (position, reference, alternate) =
+    //                 Self::trim_leading_shared_bases(position, r, a);
+    //
+    //             (position, Some(reference), Some(alternate))
+    //         }
+    //     }
+    // }
+    //
+    // fn variant_type(reference: Option<&str>, alternate: Option<&str>) -> Option<VarType> {
+    //     match (reference, alternate) {
+    //         (Some(r), Some(a)) if r.len() == 1 && a.len() == 1 && a != r => Some(VarType::SNV),
+    //         (Some(r), Some(a)) if r.len() == a.len() && a != r => Some(VarType::MNV),
+    //         (Some(r), Some(a)) if r.len() > a.len() && a.len() == 1 => Some(VarType::Deletion),
+    //         (Some(r), Some(a)) if r.len() < a.len() && r.len() == 1 => Some(VarType::Insertion),
+    //         (Some(_), None) => Some(VarType::Deletion),
+    //         (None, Some(_)) => Some(VarType::Insertion),
+    //         (Some(r), Some(a)) if a != r => Some(VarType::Indel),
+    //         _ => None,
+    //     }
+    // }
+    //
+    // fn count_shared<T: Iterator<Item = char>>(itr_r: &mut T, itr_a: &mut T) -> usize {
+    //     let mut i = 0;
+    //
+    //     while let (Some(c1), Some(c2)) = (itr_r.next(), itr_a.next()) {
+    //         if c1 == c2 {
+    //             i += 1
+    //         } else {
+    //             break;
+    //         }
+    //     }
+    //
+    //     i
+    // }
+    //
+    // fn trim_trailing_shared_bases<'b>(
+    //     reference: &'b str,
+    //     alternate: &'b str,
+    // ) -> (&'b str, &'b str) {
+    //     let mut itr_r = reference.chars().rev();
+    //     let mut itr_a = alternate.chars().rev();
+    //     let i = Self::count_shared(&mut itr_r, &mut itr_a);
+    //
+    //     let mut p1 = reference.len() - i;
+    //     let mut p2 = alternate.len() - i;
+    //
+    //     if p1 == 0 || p2 == 0 {
+    //         p1 += 1;
+    //         p2 += 1;
+    //     }
+    //
+    //     (&reference[0..p1], &alternate[0..p2])
+    // }
+    //
+    // fn trim_leading_shared_bases<'b>(
+    //     position: i64,
+    //     reference: &'b str,
+    //     alternate: &'b str,
+    // ) -> (i64, &'b str, &'b str) {
+    //     let mut itr_r = reference.chars();
+    //     let mut itr_a = alternate.chars();
+    //     let mut i = Self::count_shared(&mut itr_r, &mut itr_a);
+    //
+    //     if i == reference.len() || i == alternate.len() {
+    //         i -= 1;
+    //     }
+    //
+    //     (position + i as i64, &reference[i..], &alternate[i..])
+    // }
 }

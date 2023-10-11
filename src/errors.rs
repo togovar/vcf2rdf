@@ -17,6 +17,9 @@ pub enum Error {
     #[error(transparent)]
     SerdeYamlError(#[from] serde_yaml::Error),
 
+    #[error(transparent)]
+    VcfLibError(#[from] vcf_lib::errors::Error),
+
     #[error("File not found: {0}")]
     FileNotFoundError(String),
 

@@ -9,6 +9,7 @@ pub struct Sequence<'a> {
     pub reference: &'a str,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct Assembly<'a> {
     name: &'a str,
@@ -22,17 +23,6 @@ impl<'a> Assembly<'a> {
         self.sequences.iter().find(|&x| {
             x.name == name || x.genbank == name || x.refseq == name || x.ucsc_name == name
         })
-    }
-}
-
-impl<'a> From<&crate::cli::generator::Assembly> for Assembly<'a> {
-    fn from(assembly: &crate::cli::generator::Assembly) -> Self {
-        match assembly {
-            crate::cli::generator::Assembly::GRCH37 => GRCH37_P13.clone(),
-            crate::cli::generator::Assembly::GRCH38 => GRCH38_P13.clone(),
-            crate::cli::generator::Assembly::GRCM38 => GRCM38.clone(),
-            crate::cli::generator::Assembly::GRCM39 => GRCM39.clone(),
-        }
     }
 }
 
@@ -56,7 +46,7 @@ macro_rules! sequences {
     };
 }
 
-static GRCH37_P13: Lazy<Assembly> = Lazy::new(|| Assembly {
+pub static GRCH37_P13: Lazy<Assembly> = Lazy::new(|| Assembly {
     name: "GRCh37",
     genbank: "GCA_000001405.14",
     refseq: "GCF_000001405.25",
@@ -89,7 +79,7 @@ static GRCH37_P13: Lazy<Assembly> = Lazy::new(|| Assembly {
     },
 });
 
-static GRCH38_P13: Lazy<Assembly> = Lazy::new(|| Assembly {
+pub static GRCH38_P13: Lazy<Assembly> = Lazy::new(|| Assembly {
     name: "GRCh38",
     genbank: "GCA_000001405.28",
     refseq: "GCF_000001405.39",
@@ -122,7 +112,7 @@ static GRCH38_P13: Lazy<Assembly> = Lazy::new(|| Assembly {
     },
 });
 
-static GRCM38: Lazy<Assembly> = Lazy::new(|| Assembly {
+pub static GRCM38: Lazy<Assembly> = Lazy::new(|| Assembly {
     name: "GRCm38",
     genbank: "GCA_000001635.2",
     refseq: "GCF_000001635.20",
@@ -151,7 +141,7 @@ static GRCM38: Lazy<Assembly> = Lazy::new(|| Assembly {
     },
 });
 
-static GRCM39: Lazy<Assembly> = Lazy::new(|| Assembly {
+pub static GRCM39: Lazy<Assembly> = Lazy::new(|| Assembly {
     name: "GRCm39",
     genbank: "GCA_000001635.9",
     refseq: "GCF_000001635.27",
