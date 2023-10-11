@@ -758,7 +758,7 @@ dependencies = [
 [[package]]
 name = "vcf-lib"
 version = "0.1.0"
-source = "git+https://github.com/kamonohashi-inc/vcf-lib.git#5eb178a17298b7acc26463358107ca77de137bc9"
+source = "git+https://github.com/kamonohashi-inc/vcf-lib.git#e0bdea94bd77b73227987c10bd9fa3aa3960378d"
 dependencies = [
  "once_cell",
  "regex",
@@ -767,7 +767,7 @@ dependencies = [
 
 [[package]]
 name = "vcf2rdf"
-version = "1.0.0-beta.9"
+version = "1.0.0-beta.10"
 dependencies = [
  "anyhow",
  "env_logger",

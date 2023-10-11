@@ -1,6 +1,6 @@
 [package]
 name = "vcf2rdf"
-version = "1.0.0-beta.10"
+version = "1.0.0-beta.11"
 authors = ["Daisuke Satoh <dsatoh@kamonohashi.co.jp>"]
 edition = "2018"
 description = "Convert Variant Call Format (VCF) to Resource Description Framework (RDF) Format."
