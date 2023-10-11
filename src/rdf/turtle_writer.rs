@@ -229,7 +229,7 @@ impl<'a, W: Write> TurtleWriter<'a, W> {
     }
 }
 
-static REGEX_ALLELES: Lazy<Regex> = Lazy::new(|| Regex::new(r"\A[ACGT]+\z").unwrap());
+static REGEX_ALLELES: Lazy<Regex> = Lazy::new(|| Regex::new(r"\A[ACGTURYKMSWBDHVN]+\z").unwrap());
 
 impl<'a, W: Write> Writer for TurtleWriter<'a, W> {
     fn write_record<'b>(&mut self, record: &Record<'b>) -> Result<()> {
