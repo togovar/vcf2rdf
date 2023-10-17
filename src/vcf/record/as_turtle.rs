@@ -36,7 +36,7 @@ impl Buffer {
 
     pub fn push_quoted(&mut self, string: &str, quote: char) -> () {
         self.string.push(quote);
-        self.string.push_str(string);
+        self.string.push_str(string.replace("\"", "\\\"").as_str());
         self.string.push(quote);
     }
 }
